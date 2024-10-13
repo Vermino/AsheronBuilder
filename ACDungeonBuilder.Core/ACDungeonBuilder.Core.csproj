@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net6.0-windows</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\ACE\Source\ACE.DatLoader\ACE.DatLoader.csproj" />
+        <ProjectReference Include="..\..\ACE\Source\ACE.Entity\ACE.Entity.csproj" />
+        <ProjectReference Include="..\..\ACE\Source\ACE.Common\ACE.Common.csproj" />
+    </ItemGroup>
+
+</Project>
