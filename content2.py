@@ -24,10 +24,10 @@ from datetime import datetime
 FILE_TYPES = [".py", ".txt", ".md", ".js", ".html", ".css", ".cs", ".sln", ".csproj"]
 
 # Directories to exclude
-EXCLUDE_DIRS = {"venv", ".venv", "build", ".git", ".idea", "node_modules", "__pycache__", "dist", "bin", "obj"}
+EXCLUDE_DIRS = {"ACE", "venv", ".venv", "build", ".git", ".idea", "node_modules", "__pycache__", "dist", "bin", "obj"}
 
 # File exclusions
-EXCLUDE_FILES = {".DS_Store", "Thumbs.db", ".env", "requirements.txt"}
+EXCLUDE_FILES = {"content2.py", "README.md", ".DS_Store", "Thumbs.db", ".env", "requirements.txt"}
 
 # Maximum file size for content extraction (1MB)
 MAX_FILE_SIZE = 1000000  # 1MB

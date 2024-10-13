@@ -1,25 +1,46 @@
+<!-- ACDungeonBuilder.UI/MainWindow.xaml -->
+
 <Window x:Class="ACDungeonBuilder.UI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ACDungeonBuilder.UI"
+        xmlns:rendering="clr-namespace:ACDungeonBuilder.Rendering;assembly=ACDungeonBuilder.Rendering"
         mc:Ignorable="d"
-        Title="AC Dungeon Builder" Height="450" Width="800">
+        Title="Asheron's Call Dungeon Builder" Height="720" Width="1280">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="200"/>
             <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="250"/>
         </Grid.ColumnDefinitions>
-        
+
         <!-- Asset Browser -->
-        <TreeView Grid.Column="0">
-            <!-- Populate this with loaded assets -->
-        </TreeView>
-        
-        <!-- Main Editing Area -->
-        <Grid Grid.Column="1">
-            <!-- This will contain your 3D viewport and editing tools -->
+        <Grid Grid.Column="0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="Asset Browser" FontWeight="Bold" Margin="5"/>
+            <TreeView x:Name="AssetTreeView" Grid.Row="1"/>
+        </Grid>
+
+        <!-- 3D Viewport -->
+        <Border Grid.Column="1" BorderBrush="Black" BorderThickness="1">
+            <rendering:OpenGLControl x:Name="OpenGLControl"/>
+        </Border>
+
+        <!-- Properties Panel -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <TextBlock Text="Properties" FontWeight="Bold" Margin="5"/>
+            <ScrollViewer Grid.Row="1">
+                <StackPanel x:Name="PropertiesPanel"/>
+            </ScrollViewer>
         </Grid>
     </Grid>
 </Window>

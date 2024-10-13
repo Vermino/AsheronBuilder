@@ -1,6 +1,6 @@
-﻿using System.Windows;
+using System.Windows;
 
-namespace ACDungeonBuilder
+namespace ACDungeonBuilder.UI
 {
     public partial class App : Application
     {
