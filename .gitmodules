@@ -1,0 +1,3 @@
+[submodule "External/DatReaderWriter"]
+	path = External/DatReaderWriter
+	url = https://github.com/ACClientLib/DatReaderWriter.git

@@ -1,93 +1,115 @@
-// ACDungeonBuilder.Rendering/Shader.cs
-
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using System;
+using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 
 namespace ACDungeonBuilder.Rendering
 {
     public class Shader
     {
-        public int Handle { get; private set; }
+        public readonly int Handle;
 
-        public Shader(string vertexResourceName, string fragmentResourceName)
+        public Shader(string vertexPath, string fragmentPath)
         {
-            string vertexShaderSource = LoadShaderSource(vertexResourceName);
-            string fragmentShaderSource = LoadShaderSource(fragmentResourceName);
+            string vertexShaderSource;
+            string fragmentShaderSource;
 
-            var vertexShader = GL.CreateShader(ShaderType.VertexShader);
-            GL.ShaderSource(vertexShader, vertexShaderSource);
-            CompileShader(vertexShader);
+            try
+            {
+                using (Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(vertexPath))
+                {
+                    if (stream == null)
+                        throw new InvalidOperationException($"Could not load vertex shader resource: {vertexPath}");
+                    using (StreamReader reader = new StreamReader(stream))
+                    {
+                        vertexShaderSource = reader.ReadToEnd();
+                    }
+                }
 
-            var fragmentShader = GL.CreateShader(ShaderType.FragmentShader);
-            GL.ShaderSource(fragmentShader, fragmentShaderSource);
-            CompileShader(fragmentShader);
+                using (Stream? stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(fragmentPath))
+                {
+                    if (stream == null)
+                        throw new InvalidOperationException($"Could not load fragment shader resource: {fragmentPath}");
+                    using (StreamReader reader = new StreamReader(stream))
+                    {
+                        fragmentShaderSource = reader.ReadToEnd();
+                    }
+                }
+            
+
+            int vertexShader = CompileShader(ShaderType.VertexShader, vertexShaderSource);
+            int fragmentShader = CompileShader(ShaderType.FragmentShader, fragmentShaderSource);
 
             Handle = GL.CreateProgram();
+
             GL.AttachShader(Handle, vertexShader);
             GL.AttachShader(Handle, fragmentShader);
+
             LinkProgram(Handle);
 
             GL.DetachShader(Handle, vertexShader);
             GL.DetachShader(Handle, fragmentShader);
-            GL.DeleteShader(vertexShader);
             GL.DeleteShader(fragmentShader);
+            GL.DeleteShader(vertexShader);
+            
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Error loading shaders: {ex.Message}");
+            Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+            throw; // Re-throw the exception to be caught in Renderer.Run
+        }
         }
 
-        private string LoadShaderSource(string resourceName)
+        private static int CompileShader(ShaderType type, string source)
         {
-            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-            var stream = assembly.GetManifestResourceStream(resourceName);
-
-            if (stream == null)
-            {
-                throw new InvalidOperationException($"Could not find embedded resource '{resourceName}'. Make sure it exists and its build action is set to 'Embedded Resource'.");
-            }
-
-            using (stream)
-            using (var reader = new System.IO.StreamReader(stream))
-            {
-                return reader.ReadToEnd();
-            }
-        }
-
-        private static void CompileShader(int shader)
-        {
+            int shader = GL.CreateShader(type);
+            GL.ShaderSource(shader, source);
             GL.CompileShader(shader);
-            GL.GetShader(shader, ShaderParameter.CompileStatus, out var code);
-            if (code != (int)All.True)
+
+            GL.GetShader(shader, ShaderParameter.CompileStatus, out int success);
+            if (success == 0)
             {
-                var infoLog = GL.GetShaderInfoLog(shader);
-                throw new Exception($"Error occurred whilst compiling Shader({shader}).\n\n{infoLog}");
+                string infoLog = GL.GetShaderInfoLog(shader);
+                Debug.WriteLine($"Error compiling {type} shader: {infoLog}");
             }
+
+            return shader;
         }
 
         private static void LinkProgram(int program)
         {
             GL.LinkProgram(program);
-            GL.GetProgram(program, GetProgramParameterName.LinkStatus, out var code);
-            if (code != (int)All.True)
+
+            GL.GetProgram(program, GetProgramParameterName.LinkStatus, out int success);
+            if (success == 0)
             {
-                throw new Exception($"Error occurred whilst linking Program({program})");
+                string infoLog = GL.GetProgramInfoLog(program);
+                Debug.WriteLine($"Error linking shader program: {infoLog}");
             }
         }
-
         public void Use()
         {
             GL.UseProgram(Handle);
+            Debug.WriteLine($"Shader program {Handle} in use");
         }
 
-        public void SetMatrix4(string name, Matrix4 matrix)
+        public void SetMatrix4(string name, Matrix4 data)
         {
-            int location = GL.GetUniformLocation(Handle, name);
-            GL.UniformMatrix4(location, true, ref matrix);
+            GL.UseProgram(Handle);
+            var location = GL.GetUniformLocation(Handle, name);
+            GL.UniformMatrix4(location, true, ref data);
+            Debug.WriteLine($"Set matrix4 uniform '{name}' at location {location}");
         }
 
-        public void SetVector3(string name, Vector3 vector)
+        public void SetVector3(string name, Vector3 data)
         {
+            GL.UseProgram(Handle);
             int location = GL.GetUniformLocation(Handle, name);
-            GL.Uniform3(location, vector);
+            GL.Uniform3(location, data);
+            Debug.WriteLine($"Set vector3 uniform '{name}' at location {location}");
         }
     }
 }

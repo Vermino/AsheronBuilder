@@ -24,11 +24,12 @@
             </Grid.RowDefinitions>
             <TextBlock Text="Asset Browser" FontWeight="Bold" Margin="5"/>
             <TreeView x:Name="AssetTreeView" Grid.Row="1"/>
+            <Button Content="Load Environment" Click="LoadEnvironmentButton_Click" Grid.Column="0" VerticalAlignment="Bottom" Margin="5"/>
         </Grid>
 
         <!-- 3D Viewport -->
         <Border Grid.Column="1" BorderBrush="Black" BorderThickness="1">
-            <rendering:OpenGLControl x:Name="OpenGLControl"/>
+            <rendering:OpenGLControl x:Name="OpenGLControl" Background="LightGray"/>
         </Border>
 
         <!-- Properties Panel -->

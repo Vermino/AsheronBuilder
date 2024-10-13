@@ -7,9 +7,17 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\ACE\Source\ACE.DatLoader\ACE.DatLoader.csproj" />
-        <ProjectReference Include="..\..\ACE\Source\ACE.Entity\ACE.Entity.csproj" />
-        <ProjectReference Include="..\..\ACE\Source\ACE.Common\ACE.Common.csproj" />
+        <ProjectReference Include="..\External\DatReaderWriter\DatReaderWriter\DatReaderWriter.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Reference Include="DatReaderWriter">
+        <HintPath>..\..\DatReaderWriter\DatReaderWriter\bin\Debug\netstandard2.0\DatReaderWriter.dll</HintPath>
+      </Reference>
     </ItemGroup>
 
 </Project>

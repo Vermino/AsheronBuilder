@@ -21,10 +21,10 @@ import glob
 from datetime import datetime
 
 # File types to be processed (can be customized)
-FILE_TYPES = [".py", ".txt", ".md", ".js", ".html", ".css", ".cs", ".sln", ".csproj"]
+FILE_TYPES = [".py", ".txt", ".md", ".js", ".html", ".css", ".cs", ".sln", ".csproj", ".raw", ".xaml"]
 
 # Directories to exclude
-EXCLUDE_DIRS = {"ACE", "venv", ".venv", "build", ".git", ".idea", "node_modules", "__pycache__", "dist", "bin", "obj"}
+EXCLUDE_DIRS = {"External", "venv", ".venv", "build", ".git", ".idea", "node_modules", "__pycache__", "dist", "bin", "obj"}
 
 # File exclusions
 EXCLUDE_FILES = {"content2.py", "README.md", ".DS_Store", "Thumbs.db", ".env", "requirements.txt"}

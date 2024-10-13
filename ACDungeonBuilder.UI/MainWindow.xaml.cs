@@ -1,9 +1,10 @@
-// ACDungeonBuilder.UI/MainWindow.xaml.cs
-
+using System;
+using System.Diagnostics;
 using System.Windows;
 using ACDungeonBuilder.Core.Assets;
 using ACDungeonBuilder.Core.Dungeon;
 using ACDungeonBuilder.Rendering;
+using Microsoft.Win32;
 
 namespace ACDungeonBuilder.UI
 {
@@ -17,6 +18,7 @@ namespace ACDungeonBuilder.UI
             InitializeComponent();
             InitializeAssetManager();
             LoadAssets();
+            
         }
 
         private void InitializeAssetManager()
@@ -51,6 +53,40 @@ namespace ACDungeonBuilder.UI
                 environmentsNode.Items.Add(new System.Windows.Controls.TreeViewItem { Header = $"Environment {environmentId}" });
             }
             AssetTreeView.Items.Add(environmentsNode);
+        }
+
+        private void LoadEnvironmentButton_Click(object sender, RoutedEventArgs e)
+        {
+            Debug.WriteLine("Load Environment button clicked");
+            var openFileDialog = new OpenFileDialog
+            {
+                Filter = "Raw Environment Files (*.raw)|*.raw"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                string filePath = openFileDialog.FileName;
+                Debug.WriteLine($"Selected file: {filePath}");
+                
+                try
+                {
+                    var environmentData = EnvironmentLoader.LoadFromRawFile(filePath);
+                    Debug.WriteLine($"Environment data loaded: {environmentData.Vertices.Count} vertices, {environmentData.Indices.Count} indices");
+                    
+                    OpenGLControl.LoadEnvironment(environmentData);
+                    Debug.WriteLine("Environment data passed to OpenGLControl");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error loading environment: {ex.Message}");
+                    Debug.WriteLine($"Stack trace: {ex.StackTrace}");
+                    MessageBox.Show($"Error loading environment: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+            else
+            {
+                Debug.WriteLine("File selection cancelled");
+            }
         }
     }
 }
