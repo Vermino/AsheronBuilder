@@ -9,6 +9,7 @@ namespace ACDungeonBuilder.Rendering
         public Vector3 Position;
         public Vector3 Front;
         public Vector3 Up;
+        public Vector3 Right;
         public float AspectRatio { get; set; }
         public float Yaw { get; set; } = -MathHelper.PiOver2;
         public float Pitch { get; set; }
@@ -25,27 +26,28 @@ namespace ACDungeonBuilder.Rendering
 
         public Camera(Vector3 position, float aspectRatio)
         {
-            Position = new Vector3(0, 5, 15); // Move the camera further back
+            Position = new Vector3(0, 10, 10);
             AspectRatio = aspectRatio;
+            Yaw = -90f;
+            Pitch = -45f;
             Front = -Vector3.UnitZ;
             Up = Vector3.UnitY;
             UpdateVectors();
-            Debug.WriteLine($"Camera initialized at position {Position}");
         }
 
         public Matrix4 GetViewMatrix() => Matrix4.LookAt(Position, Position + Front, Up);
 
         public Matrix4 GetProjectionMatrix() => Matrix4.CreatePerspectiveFieldOfView(_fov, AspectRatio, 0.1f, 1000f);
 
-        private void UpdateVectors()
+        public void UpdateVectors()
         {
-            Front.X = MathF.Cos(Pitch) * MathF.Cos(Yaw);
-            Front.Y = MathF.Sin(Pitch);
-            Front.Z = MathF.Cos(Pitch) * MathF.Sin(Yaw);
+            Front.X = (float)(Math.Cos(MathHelper.DegreesToRadians(Yaw)) * Math.Cos(MathHelper.DegreesToRadians(Pitch)));
+            Front.Y = (float)Math.Sin(MathHelper.DegreesToRadians(Pitch));
+            Front.Z = (float)(Math.Sin(MathHelper.DegreesToRadians(Yaw)) * Math.Cos(MathHelper.DegreesToRadians(Pitch)));
             Front = Vector3.Normalize(Front);
 
-            Vector3 right = Vector3.Normalize(Vector3.Cross(Front, Vector3.UnitY));
-            Up = Vector3.Normalize(Vector3.Cross(right, Front));
+            Right = Vector3.Normalize(Vector3.Cross(Front, Vector3.UnitY));
+            Up = Vector3.Normalize(Vector3.Cross(Right, Front));
         }
 
         public void Move(Vector3 offset) => Position += offset;

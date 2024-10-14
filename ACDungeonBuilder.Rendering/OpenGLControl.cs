@@ -46,13 +46,13 @@ namespace ACDungeonBuilder.Rendering
             KeyUp += OnKeyUp;
         }
         
-        private void OnMouseMove(object sender, MouseEventArgs e)
+        public void OnMouseMove(object sender, MouseEventArgs e)
         {
             var pos = e.GetPosition(this);
             _renderer.HandleMouseMove(new MouseMoveEventArgs((float)pos.X, (float)pos.Y, 0f, 0f));
         }
 
-        private void OnMouseDown(object sender, MouseButtonEventArgs e)
+        public void OnMouseDown(object sender, MouseButtonEventArgs e)
         {
             if (e.RightButton == MouseButtonState.Pressed)
             {
@@ -60,7 +60,7 @@ namespace ACDungeonBuilder.Rendering
             }
         }
 
-        private void OnMouseUp(object sender, MouseButtonEventArgs e)
+        public void OnMouseUp(object sender, MouseButtonEventArgs e)
         {
             if (e.RightButton == MouseButtonState.Released)
             {
@@ -68,12 +68,12 @@ namespace ACDungeonBuilder.Rendering
             }
         }
 
-        private void OnKeyDown(object sender, KeyEventArgs e)
+        public void OnKeyDown(object sender, KeyEventArgs e)
         {
             _renderer.HandleKeyDown(new KeyboardKeyEventArgs(MapKey(e.Key), 0, MapKeyModifiers(Keyboard.Modifiers), e.IsRepeat));
         }
 
-        private void OnKeyUp(object sender, KeyEventArgs e)
+        public void OnKeyUp(object sender, KeyEventArgs e)
         {
             _renderer.HandleKeyUp(new KeyboardKeyEventArgs(MapKey(e.Key), 0, MapKeyModifiers(Keyboard.Modifiers), e.IsRepeat));
         }
@@ -139,64 +139,6 @@ namespace ACDungeonBuilder.Rendering
             _renderTimer.Interval = TimeSpan.FromMilliseconds(16); // ~60 FPS
             _renderTimer.Tick += OnRenderTimer;
             _renderTimer.Start();
-
-            // Handle input events
-            MouseMove += (s, args) =>
-            {
-                var pos = args.GetPosition(this);
-                _renderer.HandleMouseMove(new MouseMoveEventArgs((float)pos.X, (float)pos.Y, 0f, 0f));
-            };
-
-            MouseDown += (s, args) =>
-            {
-                if (args.RightButton == MouseButtonState.Pressed)
-                {
-                    _renderer.HandleMouseDown(MouseButton.Right);
-                }
-            };
-
-            MouseUp += (s, args) =>
-            {
-                if (args.RightButton == MouseButtonState.Released)
-                {
-                    _renderer.HandleMouseUp(MouseButton.Right);
-                }
-            };
-
-            KeyDown += (s, args) =>
-            {
-                _renderer.HandleKeyDown(new KeyboardKeyEventArgs(MapKey(args.Key), 0,
-                    MapKeyModifiers(Keyboard.Modifiers), args.IsRepeat));
-            };
-
-            KeyUp += (s, args) =>
-            {
-                _renderer.HandleKeyUp(new KeyboardKeyEventArgs(MapKey(args.Key), 0,
-                    MapKeyModifiers(Keyboard.Modifiers), args.IsRepeat));
-            };
-
-            Keys MapKey(Key key)
-            {
-                // This is a simple mapping function. You might need to extend it for all keys you use.
-                switch (key)
-                {
-                    case Key.W: return Keys.W;
-                    case Key.A: return Keys.A;
-                    case Key.S: return Keys.S;
-                    case Key.D: return Keys.D;
-                    // Add more mappings as needed
-                    default: return Keys.Unknown;
-                }
-            }
-
-            KeyModifiers MapKeyModifiers(ModifierKeys modifiers)
-            {
-                KeyModifiers result = 0; // No key modifiers active, equivalent to "None"
-                if ((modifiers & ModifierKeys.Alt) != 0) result |= KeyModifiers.Alt;
-                if ((modifiers & ModifierKeys.Control) != 0) result |= KeyModifiers.Control;
-                if ((modifiers & ModifierKeys.Shift) != 0) result |= KeyModifiers.Shift;
-                return result;
-            }
         }
 
         private void SetupFramebuffer()

@@ -5,6 +5,7 @@ using OpenTK.Windowing.Desktop;
 using ACDungeonBuilder.Core.Assets;
 using ACDungeonBuilder.Core.Dungeon;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Diagnostics;
 using OpenTK.Windowing.GraphicsLibraryFramework;
@@ -23,12 +24,16 @@ namespace ACDungeonBuilder.Rendering
         private EnvironmentLoader.EnvironmentData _environmentData;
         private int _axesVao;
         private int _axesVbo;
-        private int _planeVAO;
-        private int _planeVBO;
-        private int _planeEBO;
-        private float _cameraSpeed = 0.05f;
+        private int _gridVao;
+        private int _gridVbo;
+        private float _gridCellSize = 1.0f;
+        private int _gridSize = 20;
         private bool _isRightMouseDown = false;
         private Vector2 _lastMousePosition;
+        private float _mouseSensitivity = 0.1f;
+        private float _cameraSpeed = 0.05f;
+        
+        
 
         // Debug rendering
         private int _debugVao;
@@ -54,7 +59,7 @@ namespace ACDungeonBuilder.Rendering
 
                 SetupDebugRendering();
                 SetupAxes();
-                SetupPlane();
+                SetupGrid();
                 Debug.WriteLine("Debug rendering and axes set up successfully");
 
                 _environmentData = new EnvironmentLoader.EnvironmentData(); // Initialize with empty data
@@ -66,65 +71,62 @@ namespace ACDungeonBuilder.Rendering
             }
         }
 
-        private void SetupPlane()
-        {
-            float[] vertices =
-            {
-                -5.0f, 0.0f, -5.0f,
-                5.0f, 0.0f, -5.0f,
-                5.0f, 0.0f, 5.0f,
-                -5.0f, 0.0f, 5.0f
-            };
-
-            uint[] indices =
-            {
-                0, 1, 2,
-                2, 3, 0
-            };
-
-            GL.GenVertexArrays(1, out _planeVAO);
-            GL.BindVertexArray(_planeVAO);
-
-            GL.GenBuffers(1, out _planeVBO);
-            GL.BindBuffer(BufferTarget.ArrayBuffer, _planeVBO);
-            GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices,
-                BufferUsageHint.StaticDraw);
-
-            GL.GenBuffers(1, out _planeEBO);
-            GL.BindBuffer(BufferTarget.ElementArrayBuffer, _planeEBO);
-            GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices,
-                BufferUsageHint.StaticDraw);
-
-            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
-            GL.EnableVertexAttribArray(0);
-        }
-
         private void SetupAxes()
         {
             float[] axesVertices =
             {
                 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // X-axis start (red)
-                5.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // X-axis end (red)
+                10.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // X-axis end (red)
                 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, // Y-axis start (green)
-                0.0f, 5.0f, 0.0f, 0.0f, 1.0f, 0.0f, // Y-axis end (green)
+                0.0f, 10.0f, 0.0f, 0.0f, 1.0f, 0.0f, // Y-axis end (green)
                 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, // Z-axis start (blue)
-                0.0f, 0.0f, 5.0f, 0.0f, 0.0f, 1.0f // Z-axis end (blue)
+                0.0f, 0.0f, 10.0f, 0.0f, 0.0f, 1.0f  // Z-axis end (blue)
             };
 
             GL.GenVertexArrays(1, out _axesVao);
             GL.BindVertexArray(_axesVao);
-            GL.DrawArrays(PrimitiveType.Lines, 0, 6);
 
             GL.GenBuffers(1, out _axesVbo);
             GL.BindBuffer(BufferTarget.ArrayBuffer, _axesVbo);
-            GL.BufferData(BufferTarget.ArrayBuffer, axesVertices.Length * sizeof(float), axesVertices,
-                BufferUsageHint.StaticDraw);
+            GL.BufferData(BufferTarget.ArrayBuffer, axesVertices.Length * sizeof(float), axesVertices, BufferUsageHint.StaticDraw);
 
             GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
             GL.EnableVertexAttribArray(0);
 
             GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
             GL.EnableVertexAttribArray(1);
+        }
+        
+        private void SetupGrid()
+        {
+            List<float> gridVertices = new List<float>();
+    
+            for (int i = -_gridSize; i <= _gridSize; i++)
+            {
+                gridVertices.AddRange(new float[] { i * _gridCellSize, 0, -_gridSize * _gridCellSize, 0.5f, 0.5f, 0.5f });
+                gridVertices.AddRange(new float[] { i * _gridCellSize, 0, _gridSize * _gridCellSize, 0.5f, 0.5f, 0.5f });
+                gridVertices.AddRange(new float[] { -_gridSize * _gridCellSize, 0, i * _gridCellSize, 0.5f, 0.5f, 0.5f });
+                gridVertices.AddRange(new float[] { _gridSize * _gridCellSize, 0, i * _gridCellSize, 0.5f, 0.5f, 0.5f });
+            }
+
+            GL.GenVertexArrays(1, out _gridVao);
+            GL.BindVertexArray(_gridVao);
+
+            GL.GenBuffers(1, out _gridVbo);
+            GL.BindBuffer(BufferTarget.ArrayBuffer, _gridVbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, gridVertices.Count * sizeof(float), gridVertices.ToArray(), BufferUsageHint.StaticDraw);
+
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+            GL.EnableVertexAttribArray(0);
+
+            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+            GL.EnableVertexAttribArray(1);
+        }
+
+        public void SetGridCellSize(float size)
+        {
+            _gridCellSize = Math.Clamp(size, 0.1f, 10f);
+            SetupGrid();
         }
 
         public void LoadEnvironment(EnvironmentLoader.EnvironmentData environmentData)
@@ -199,7 +201,6 @@ namespace ACDungeonBuilder.Rendering
 
         public void OnRenderFrame()
         {
-            Debug.WriteLine("OnRenderFrame called");
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             _shader.Use();
@@ -209,33 +210,22 @@ namespace ACDungeonBuilder.Rendering
             _shader.SetMatrix4("view", _camera.GetViewMatrix());
             _shader.SetMatrix4("projection", _camera.GetProjectionMatrix());
 
-            // Draw axes with thicker lines and different colors
-            GL.LineWidth(3.0f);
+            // Draw grid
+            GL.BindVertexArray(_gridVao);
+            GL.DrawArrays(PrimitiveType.Lines, 0, _gridSize * 4 + 4);
+
+            // Draw axes
             GL.BindVertexArray(_axesVao);
             GL.DrawArrays(PrimitiveType.Lines, 0, 6);
-            Debug.WriteLine("Axes drawn");
-
-            // Draw plane with a different color
-            GL.BindVertexArray(_planeVAO);
-            _shader.SetVector3("color", new Vector3(0.5f, 0.5f, 0.5f)); // Grey color for the plane
-            GL.DrawElements(PrimitiveType.Triangles, 6, DrawElementsType.UnsignedInt, 0);
-            Debug.WriteLine("Plane drawn");
 
             // Draw environment if available
             if (_environmentData != null && _environmentData.Indices.Count > 0)
             {
                 GL.BindVertexArray(_vao);
-                _shader.SetVector3("color", new Vector3(1.0f, 1.0f, 1.0f)); // White color for the environment
                 GL.DrawElements(PrimitiveType.Lines, _environmentData.Indices.Count, DrawElementsType.UnsignedInt, 0);
-                Debug.WriteLine($"Environment drawn with {_environmentData.Indices.Count} indices");
-            }
-            else
-            {
-                Debug.WriteLine("No environment data to render");
             }
 
             GL.Flush();
-            Debug.WriteLine("Frame rendered and flushed");
         }
 
 
@@ -244,20 +234,41 @@ namespace ACDungeonBuilder.Rendering
             GL.Viewport(0, 0, e.Width, e.Height);
             _camera.AspectRatio = e.Width / (float)e.Height;
         }
-
-        public void HandleKeyUp(KeyboardKeyEventArgs e)
+        
+        public void HandleKeyDown(KeyboardKeyEventArgs e)
         {
-            // Handle key up events if needed
+            const float cameraSpeed = 0.1f;
+
+            switch (e.Key)
+            {
+                case Keys.W:
+                    _camera.Position += _camera.Front * cameraSpeed;
+                    break;
+                case Keys.S:
+                    _camera.Position -= _camera.Front * cameraSpeed;
+                    break;
+                case Keys.A:
+                    _camera.Position -= Vector3.Normalize(Vector3.Cross(_camera.Front, _camera.Up)) * cameraSpeed;
+                    break;
+                case Keys.D:
+                    _camera.Position += Vector3.Normalize(Vector3.Cross(_camera.Front, _camera.Up)) * cameraSpeed;
+                    break;
+            }
         }
 
         public void HandleMouseMove(MouseMoveEventArgs e)
         {
             if (_isRightMouseDown)
             {
-                float sensitivity = 0.1f;
                 float deltaX = e.X - _lastMousePosition.X;
                 float deltaY = e.Y - _lastMousePosition.Y;
-                _camera.Rotate(deltaX * sensitivity, -deltaY * sensitivity);
+
+                _camera.Yaw += deltaX * _mouseSensitivity;
+                _camera.Pitch -= deltaY * _mouseSensitivity;
+
+                _camera.Pitch = Math.Clamp(_camera.Pitch, -89f, 89f);
+
+                _camera.UpdateVectors();
             }
 
             _lastMousePosition = new Vector2(e.X, e.Y);
@@ -279,23 +290,10 @@ namespace ACDungeonBuilder.Rendering
             }
         }
 
-        public void HandleKeyDown(KeyboardKeyEventArgs e)
+        public void HandleKeyUp(KeyboardKeyEventArgs e)
         {
-            switch (e.Key)
-            {
-                case Keys.W:
-                    _camera.Move(_camera.Front * _cameraSpeed);
-                    break;
-                case Keys.S:
-                    _camera.Move(-_camera.Front * _cameraSpeed);
-                    break;
-                case Keys.A:
-                    _camera.Move(-Vector3.Normalize(Vector3.Cross(_camera.Front, _camera.Up)) * _cameraSpeed);
-                    break;
-                case Keys.D:
-                    _camera.Move(Vector3.Normalize(Vector3.Cross(_camera.Front, _camera.Up)) * _cameraSpeed);
-                    break;
-            }
+            // Handle key up events if needed
         }
+        
     }
 }

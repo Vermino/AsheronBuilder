@@ -29,7 +29,14 @@
 
         <!-- 3D Viewport -->
         <Border Grid.Column="1" BorderBrush="Black" BorderThickness="1">
-            <rendering:OpenGLControl x:Name="OpenGLControl" Background="LightGray"/>
+            <rendering:OpenGLControl x:Name="OpenGLControl" 
+                                     Background="LightGray"
+                                     Focusable="True"
+                                     FocusVisualStyle="{x:Null}"
+                                     KeyDown="OpenGLControl_KeyDown"
+                                     MouseMove="OpenGLControl_MouseMove"
+                                     MouseDown="OpenGLControl_MouseDown"
+                                     MouseUp="OpenGLControl_MouseUp"/>
         </Border>
 
         <!-- Properties Panel -->

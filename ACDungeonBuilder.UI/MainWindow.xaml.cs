@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Windows;
+using System.Windows.Input;
 using ACDungeonBuilder.Core.Assets;
 using ACDungeonBuilder.Core.Dungeon;
 using ACDungeonBuilder.Rendering;
@@ -54,6 +55,28 @@ namespace ACDungeonBuilder.UI
             }
             AssetTreeView.Items.Add(environmentsNode);
         }
+        
+        private void OpenGLControl_KeyDown(object sender, KeyEventArgs e)
+        {
+            OpenGLControl.OnKeyDown(sender, e); // Pass both parameters
+        }
+
+        private void OpenGLControl_MouseMove(object sender, MouseEventArgs e)
+        {
+            OpenGLControl.OnMouseMove(sender, e); // Pass both parameters
+        }
+
+        private void OpenGLControl_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            OpenGLControl.OnMouseDown(sender, e); // Pass both parameters
+            OpenGLControl.Focus();
+        }
+
+        private void OpenGLControl_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            OpenGLControl.OnMouseUp(sender, e); // Pass both parameters
+        }
+
 
         private void LoadEnvironmentButton_Click(object sender, RoutedEventArgs e)
         {
