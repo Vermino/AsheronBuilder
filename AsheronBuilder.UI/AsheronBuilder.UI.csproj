@@ -12,4 +12,8 @@
         <ProjectReference Include="..\AsheronBuilder.Rendering\AsheronBuilder.Rendering.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="OpenTK" Version="4.8.2" />
+    </ItemGroup>
+
 </Project>

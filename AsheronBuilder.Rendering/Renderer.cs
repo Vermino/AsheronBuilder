@@ -275,73 +275,7 @@ namespace AsheronBuilder.Rendering
 
             GL.Flush();
         }
-
-        public void SetDungeonLayout(DungeonLayout dungeonLayout)
-        {
-            _dungeonLayout = dungeonLayout;
-            UpdateEnvironmentData();
-        }
-
-        private void UpdateEnvironmentData()
-        {
-            _environmentData = new EnvironmentLoader.EnvironmentData();
-            foreach (var area in _dungeonLayout.Hierarchy.RootArea.GetAllAreas())
-            {
-                foreach (var envCell in area.EnvCells)
-                {
-                    AddEnvCellToEnvironmentData(envCell);
-                }
-            }
-            SetupEnvironmentBuffers();
-        }
-
-        private void AddEnvCellToEnvironmentData(EnvCell envCell)
-        {
-            Vector3[] cubeVertices = {
-                new Vector3(-0.5f, -0.5f, -0.5f),
-                new Vector3(0.5f, -0.5f, -0.5f),
-                new Vector3(0.5f, 0.5f, -0.5f),
-                new Vector3(-0.5f, 0.5f, -0.5f),
-                new Vector3(-0.5f, -0.5f, 0.5f),
-                new Vector3(0.5f, -0.5f, 0.5f),
-                new Vector3(0.5f, 0.5f, 0.5f),
-                new Vector3(-0.5f, 0.5f, 0.5f)
-            };
         
-            int[] cubeIndices = {
-                0, 1, 1, 2, 2, 3, 3, 0,
-                4, 5, 5, 6, 6, 7, 7, 4,
-                0, 4, 1, 5, 2, 6, 3, 7
-            };
-        
-            int baseIndex = _environmentData.Vertices.Count;
-
-            Matrix4 scaleMatrix = Matrix4.CreateScale(envCell.Scale.X, envCell.Scale.Y, envCell.Scale.Z);
-            OpenTK.Mathematics.Quaternion openTKQuaternion = new OpenTK.Mathematics.Quaternion(envCell.Rotation.X, envCell.Rotation.Y, envCell.Rotation.Z, envCell.Rotation.W);
-            Matrix4 rotationMatrix = Matrix4.CreateFromQuaternion(openTKQuaternion);
-            Matrix4 translationMatrix = Matrix4.CreateTranslation(envCell.Position.X, envCell.Position.Y, envCell.Position.Z);
-
-            Matrix4 transform = scaleMatrix * rotationMatrix * translationMatrix;
-        
-            foreach (var vertex in cubeVertices)
-            { 
-                Vector3 transformedVertex = Vector3.TransformPosition(vertex, transform);
-                _environmentData.Vertices.Add(new System.Numerics.Vector3(transformedVertex.X, transformedVertex.Y, transformedVertex.Z));
-            }
-            
-            foreach (var index in cubeIndices)
-            {
-                _environmentData.Indices.Add(baseIndex + index);
-            }
-        }
-
-        public void UpdateFrame(FrameEventArgs e)
-        {
-            if (_isFocused)
-            {
-                _camera.HandleKeyboardInput(_keyStates, (float)e.Time);
-            }
-        }
 
         public void Dispose()
         {

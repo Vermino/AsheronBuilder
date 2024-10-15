@@ -9,6 +9,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using AsheronBuilder.Core.Dungeon;
 
+
 namespace AsheronBuilder.UI.Controls
 {
     public partial class DungeonLayoutEditor : UserControl
@@ -76,6 +77,31 @@ namespace AsheronBuilder.UI.Controls
         public void StartDoorPlacement()
         {
             _isPlacingDoor = true;
+        }
+        
+        private void UpdateTreeView()
+        {
+            DungeonHierarchyTreeView.Items.Clear();
+            AddAreaToTreeView(_dungeonLayout.Hierarchy.RootArea, null);
+        }
+
+        private void AddAreaToTreeView(DungeonArea area, TreeViewItem parentItem)
+        {
+            var item = new TreeViewItem { Header = area.Name };
+            if (parentItem == null)
+                DungeonHierarchyTreeView.Items.Add(item);
+            else
+                parentItem.Items.Add(item);
+
+            foreach (var childArea in area.ChildAreas)
+                AddAreaToTreeView(childArea, item);
+        }
+
+        private string GetAreaPath(DungeonArea area)
+        {
+            if (area.ParentArea == null)
+                return area.Name;
+            return GetAreaPath(area.ParentArea) + "/" + area.Name;
         }
 
         private void RedrawDungeon()

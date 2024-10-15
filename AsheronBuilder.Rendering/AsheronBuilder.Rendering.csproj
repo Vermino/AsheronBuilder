@@ -8,9 +8,9 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="OpenTK" Version="4.7.5" />
-        <PackageReference Include="OpenTK.GLWpfControl" Version="4.0.0" />
-        <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
+        <PackageReference Include="OpenTK" Version="4.8.2" />
+        <PackageReference Include="OpenTK.GLWpfControl" Version="4.3.2" />
+        <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
         <None Include="Shaders\**" CopyToOutputDirectory="PreserveNewest" />
         <ProjectReference Include="..\AsheronBuilder.Core\AsheronBuilder.Core.csproj" />
         <EmbeddedResource Include="Shaders\shader.vert" />

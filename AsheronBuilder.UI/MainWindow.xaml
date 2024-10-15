@@ -39,10 +39,10 @@
 
         <!-- Main 3D Viewport -->
         <Border Grid.Row="1" BorderBrush="Black" BorderThickness="1" Margin="5">
-            <rendering:OpenGLControl x:Name="MainViewport"/>
+            <rendering:OpenGLControl x:Name="MainViewport" Background="Black"/>
         </Border>
 
-      <!-- Right Panel -->
+        <!-- Right Panel -->
         <StackPanel Grid.Row="1" Grid.Column="1" Margin="5">
             <!-- Navigation Section -->
             <GroupBox Header="Navigation" Foreground="White" BorderBrush="White">
@@ -118,10 +118,10 @@
 
             <!-- Mini-map -->
             <Border Grid.Column="0" BorderBrush="Black" BorderThickness="1" Margin="5">
-                <rendering:OpenGLControl x:Name="MiniMap"/>
+                <rendering:OpenGLControl x:Name="MiniMap" Background="#808080"/>
             </Border>
 
-          <!-- Central bottom panel -->
+            <!-- Central bottom panel -->
             <StackPanel Grid.Column="1" Orientation="Vertical" Margin="5">
                 <TextBlock Text="OpenGL content: Call Start() on the control to begin rendering." Foreground="White"/>
                 <StackPanel Orientation="Horizontal" Margin="0,10,0,0">

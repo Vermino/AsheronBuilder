@@ -1,6 +1,8 @@
-// AsheronBuilder.Core/Dungeon/DungeonLayout.cs
+// File: AsheronBuilder.Core/Dungeon/DungeonLayout.cs
+
 using System.Collections.Generic;
-using System.Numerics;
+using System.Linq;
+using OpenTK.Mathematics;
 
 namespace AsheronBuilder.Core.Dungeon
 {
@@ -17,7 +19,7 @@ namespace AsheronBuilder.Core.Dungeon
             _nextEnvCellId = 1;
         }
 
-        public void AddEnvCell(EnvCell envCell, string areaPath)
+        public void AddEnvCell(EnvCell envCell, string areaPath = "Root")
         {
             envCell.Id = _nextEnvCellId++;
             _envCells[envCell.Id] = envCell;
@@ -38,34 +40,17 @@ namespace AsheronBuilder.Core.Dungeon
             return _envCells.TryGetValue(envCellId, out var envCell) ? envCell : null;
         }
 
+        public IEnumerable<EnvCell> GetAllEnvCells()
+        {
+            return _envCells.Values;
+        }
+
         public void UpdateEnvCell(EnvCell envCell)
         {
             if (_envCells.ContainsKey(envCell.Id))
             {
                 _envCells[envCell.Id] = envCell;
             }
-        }
-
-        public IEnumerable<EnvCell> GetAllEnvCells()
-        {
-            return _envCells.Values;
-        }
-    }
-
-    public class EnvCell
-    {
-        public uint Id { get; set; }
-        public uint EnvironmentId { get; set; }
-        public Vector3 Position { get; set; }
-        public Quaternion Rotation { get; set; }
-        public Vector3 Scale { get; set; }
-
-        public EnvCell(uint environmentId)
-        {
-            EnvironmentId = environmentId;
-            Position = Vector3.Zero;
-            Rotation = Quaternion.Identity;
-            Scale = Vector3.One;
         }
     }
 
@@ -89,15 +74,13 @@ namespace AsheronBuilder.Core.Dungeon
             RootArea.RemoveEnvCell(envCell);
         }
 
-        public DungeonArea GetOrCreateArea(string path)
+        private DungeonArea GetOrCreateArea(string path)
         {
             var pathParts = path.Split('/');
             var currentArea = RootArea;
 
-            foreach (var part in pathParts)
+            foreach (var part in pathParts.Skip(1))
             {
-                if (string.IsNullOrEmpty(part)) continue;
-
                 var childArea = currentArea.GetChildArea(part);
                 if (childArea == null)
                 {
@@ -108,55 +91,6 @@ namespace AsheronBuilder.Core.Dungeon
             }
 
             return currentArea;
-        }
-
-        public void RenameArea(string oldPath, string newName)
-        {
-            var area = GetArea(oldPath);
-            if (area != null)
-            {
-                area.Name = newName;
-            }
-        }
-
-        public void MoveArea(string sourcePath, string destinationPath)
-        {
-            var sourceArea = GetArea(sourcePath);
-            var destinationArea = GetArea(destinationPath);
-
-            if (sourceArea != null && destinationArea != null)
-            {
-                var parentPath = GetParentPath(sourcePath);
-                var parentArea = GetArea(parentPath);
-
-                if (parentArea != null)
-                {
-                    parentArea.RemoveChildArea(sourceArea);
-                    destinationArea.AddChildArea(sourceArea);
-                }
-            }
-        }
-
-        private DungeonArea GetArea(string path)
-        {
-            var pathParts = path.Split('/');
-            var currentArea = RootArea;
-
-            foreach (var part in pathParts)
-            {
-                if (string.IsNullOrEmpty(part)) continue;
-
-                currentArea = currentArea.GetChildArea(part);
-                if (currentArea == null) return null;
-            }
-
-            return currentArea;
-        }
-
-        private string GetParentPath(string path)
-        {
-            var lastSeparatorIndex = path.LastIndexOf('/');
-            return lastSeparatorIndex > 0 ? path.Substring(0, lastSeparatorIndex) : "";
         }
     }
 
@@ -178,14 +112,9 @@ namespace AsheronBuilder.Core.Dungeon
             ChildAreas.Add(area);
         }
 
-        public void RemoveChildArea(DungeonArea area)
-        {
-            ChildAreas.Remove(area);
-        }
-
         public DungeonArea GetChildArea(string name)
         {
-            return ChildAreas.Find(a => a.Name == name);
+            return ChildAreas.FirstOrDefault(a => a.Name == name);
         }
 
         public void AddEnvCell(EnvCell envCell)
@@ -201,24 +130,22 @@ namespace AsheronBuilder.Core.Dungeon
                 childArea.RemoveEnvCell(envCell);
             }
         }
+    }
 
-        public IEnumerable<DungeonArea> GetAllAreas()
-        {
-            yield return this;
-            foreach (var childArea in ChildAreas)
-            {
-                foreach (var area in childArea.GetAllAreas())
-                {
-                    yield return area;
-                }
-            }
-        }
+    public class EnvCell
+    {
+        public uint Id { get; set; }
+        public uint EnvironmentId { get; set; }
+        public Vector3 Position { get; set; }
+        public Quaternion Rotation { get; set; }
+        public Vector3 Scale { get; set; }
 
-        public string GetPath()
+        public EnvCell(uint environmentId)
         {
-            // This method assumes that each area has a unique name within its parent
-            // You may need to implement a more robust method if this assumption doesn't hold
-            return Name;
+            EnvironmentId = environmentId;
+            Position = Vector3.Zero;
+            Rotation = Quaternion.Identity;
+            Scale = Vector3.One;
         }
     }
 }

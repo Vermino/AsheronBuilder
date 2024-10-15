@@ -1,106 +1,109 @@
-using ACClientLib.DatReaderWriter;
-using ACClientLib.DatReaderWriter.Options;
+// File: AsheronBuilder.Core/Assets/AssetManager.cs
+
+using System.Collections.Concurrent;
 using AsheronBuilder.Core.DatTypes;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using Environment = AsheronBuilder.Core.DatTypes.Environment;
 
 namespace AsheronBuilder.Core.Assets
 {
     public class AssetManager
     {
-        private readonly DatManager _datManager;
-        private readonly AssetCache<Texture> _textureCache = new AssetCache<Texture>();
-        private readonly AssetCache<GfxObj> _modelCache = new AssetCache<GfxObj>();
-        private readonly AssetCache<Environment> _environmentCache = new AssetCache<Environment>();
+        private readonly string _datPath;
+        private readonly ConcurrentDictionary<uint, Texture> _textures = new();
+        private readonly ConcurrentDictionary<uint, GfxObj> _models = new();
+        private readonly ConcurrentDictionary<uint, Environment> _environments = new();
 
         public AssetManager(string datPath)
         {
-            if (!Directory.Exists(datPath))
+            _datPath = datPath;
+        }
+
+        public async Task LoadAssetsAsync()
+        {
+            var textureIds = GetTextureFileIds();
+            var modelIds = GetModelFileIds();
+            var environmentIds = GetEnvironmentFileIds();
+
+            var tasks = new List<Task>();
+
+            foreach (var id in textureIds)
             {
-                throw new DirectoryNotFoundException($"The directory '{datPath}' does not exist.");
+                tasks.Add(LoadTextureAsync(id));
             }
 
-            _datManager = new DatManager(options =>
+            foreach (var id in modelIds)
             {
-                options.DatDirectory = datPath;
-                options.IndexCachingStrategy = IndexCachingStrategy.Upfront;
+                tasks.Add(LoadModelAsync(id));
+            }
+
+            foreach (var id in environmentIds)
+            {
+                tasks.Add(LoadEnvironmentAsync(id));
+            }
+
+            await Task.WhenAll(tasks);
+        }
+
+        private async Task LoadTextureAsync(uint fileId)
+        {
+            await Task.Run(() =>
+            {
+                var texture = LoadTexture(fileId);
+                _textures[fileId] = texture;
             });
+        }
 
-            // Check if the directory is empty
-            if (Directory.GetFiles(datPath).Length == 0)
+        private async Task LoadModelAsync(uint fileId)
+        {
+            await Task.Run(() =>
             {
-                Console.WriteLine($"Warning: The directory '{datPath}' is empty. No assets will be loaded.");
-            }
+                var model = LoadModel(fileId);
+                _models[fileId] = model;
+            });
+        }
+
+        private async Task LoadEnvironmentAsync(uint fileId)
+        {
+            await Task.Run(() =>
+            {
+                var environment = LoadEnvironment(fileId);
+                _environments[fileId] = environment;
+            });
         }
 
         public List<uint> GetTextureFileIds()
         {
-            return _datManager.Portal.Tree.AsEnumerable().Where(f => f.Id >> 24 == 0x05).Select(f => f.Id).ToList();
+            // Implement this method to return a list of texture file IDs
+            return new List<uint>();
         }
-        
+
         public List<uint> GetModelFileIds()
         {
-            return _datManager.Portal.Tree.AsEnumerable().Where(f => f.Id >> 24 == 0x01).Select(f => f.Id).ToList();
+            // Implement this method to return a list of model file IDs
+            return new List<uint>();
         }
-        
+
         public List<uint> GetEnvironmentFileIds()
-        { 
-            return _datManager.Portal.Tree.AsEnumerable().Where(f => f.Id >> 24 == 0x0D).Select(f => f.Id).ToList();
-        }
-
-        public Texture LoadTexture(uint fileId)
         {
-            return _textureCache.GetOrLoad(fileId, id => 
-            {
-                if (_datManager.Portal.TryReadFile(id, out Texture texture))
-                    return texture;
-                throw new Exception($"Failed to load texture with ID {id}");
-            });
+            // Implement this method to return a list of environment file IDs
+            return new List<uint>();
         }
 
-        public GfxObj LoadModel(uint fileId)
+        private Texture LoadTexture(uint fileId)
         {
-            return _modelCache.GetOrLoad(fileId, id => 
-            {
-                if (_datManager.Portal.TryReadFile(id, out GfxObj model))
-                    return model;
-                throw new Exception($"Failed to load model with ID {id}");
-            });
+            // Implement this method to load a texture from the DAT file
+            return new Texture();
         }
 
-        public Environment LoadEnvironment(uint fileId)
+        private GfxObj LoadModel(uint fileId)
         {
-            return _environmentCache.GetOrLoad(fileId, id => 
-            {
-                if (_datManager.Portal.TryReadFile(id, out Environment environment))
-                    return environment;
-                throw new Exception($"Failed to load environment with ID {id}");
-            });
+            // Implement this method to load a model from the DAT file
+            return new GfxObj();
         }
 
-        public void ClearCaches()
+        private Environment LoadEnvironment(uint fileId)
         {
-            _textureCache.Clear();
-            _modelCache.Clear();
-            _environmentCache.Clear();
+            // Implement this method to load an environment from the DAT file
+            return new Environment();
         }
-
-        public void TrimCaches()
-        {
-            _textureCache.Trim();
-            _modelCache.Trim();
-            _environmentCache.Trim();
-        }
-
-        public int GetCachedTextureCount() => _textureCache.Count;
-        public int GetCachedModelCount() => _modelCache.Count;
-        public int GetCachedEnvironmentCount() => _environmentCache.Count;
-
-        public bool TryGetCachedTexture(uint fileId, out Texture texture) => _textureCache.TryGetValue(fileId, out texture);
-        public bool TryGetCachedModel(uint fileId, out GfxObj model) => _modelCache.TryGetValue(fileId, out model);
-        public bool TryGetCachedEnvironment(uint fileId, out Environment environment) => _environmentCache.TryGetValue(fileId, out environment);
     }
 }
