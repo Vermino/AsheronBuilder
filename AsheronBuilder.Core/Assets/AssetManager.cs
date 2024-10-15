@@ -6,6 +6,7 @@ using AsheronBuilder.Core.Constants;
 using Environment = AsheronBuilder.Core.DatTypes.Environment;
 using ACClientLib.DatReaderWriter;
 using ACClientLib.DatReaderWriter.Options;
+using AsheronBuilder.Core.Constants;
 
 namespace AsheronBuilder.Core.Assets
 {
@@ -87,6 +88,16 @@ namespace AsheronBuilder.Core.Assets
                 environmentIds.AddRange(datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.Environment).Select(f => f.Id));
             }
             return environmentIds;
+        }
+        
+        private List<uint> GetFileIdsByType(FileType fileType)
+        {
+            var fileIds = new List<uint>();
+            foreach (var datManager in _datManagers)
+            {
+                fileIds.AddRange(datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)fileType).Select(f => f.Id));
+            }
+            return fileIds;
         }
 
         public async Task LoadAssetsAsync()

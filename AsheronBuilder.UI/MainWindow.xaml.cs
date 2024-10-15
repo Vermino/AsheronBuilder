@@ -26,6 +26,12 @@ namespace AsheronBuilder.UI
 {
     public partial class MainWindow : Window
     {
+        
+        private void Log(string message)
+        {
+            string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "AsheronBuilder.log");
+            File.AppendAllText(logPath, $"{DateTime.Now}: {message}{Environment.NewLine}");
+        }
         private LandblockManager _landblockManager;
         private uint _currentLandblockId;
         private AssetManager _assetManager;
@@ -42,6 +48,7 @@ namespace AsheronBuilder.UI
         
         public MainWindow()
         {
+            Log("MainWindow constructor called");
             InitializeComponent();
             _commandManager = new CommandManager();
             _camera = new Camera(new Vector3(0, 5, 10), 1.0f);
@@ -121,20 +128,30 @@ namespace AsheronBuilder.UI
         
         private async void InitializeAsync()
         {
+            Log("InitializeAsync called");
             try
             {
+                Log("Initializing AssetManager...");
                 await InitializeAssetManager();
+                Log("AssetManager initialized");
+
+                Log("Initializing DungeonLayout...");
                 InitializeDungeonLayout();
+                Log("DungeonLayout initialized");
             
                 _currentMode = ManipulationMode.Move;
                 _snapToGrid = false;
                 _showWireframe = false;
                 _showCollision = false;
 
+                Log("Setting up event handlers...");
                 SetupEventHandlers();
+                Log("Event handlers set up");
             }
             catch (Exception ex)
             {
+                Log($"An error occurred during initialization: {ex.Message}");
+                Log($"Stack trace: {ex.StackTrace}");
                 MessageBox.Show($"An error occurred during initialization: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
@@ -144,16 +161,30 @@ namespace AsheronBuilder.UI
             try
             {
                 string assetsFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
-                Console.WriteLine($"Full assets folder path: {Path.GetFullPath(assetsFolderPath)}");
+                Log($"Full assets folder path: {Path.GetFullPath(assetsFolderPath)}");
+            
+                if (!Directory.Exists(assetsFolderPath))
+                {
+                    Log($"Assets folder does not exist: {assetsFolderPath}");
+                    throw new DirectoryNotFoundException($"Assets folder not found: {assetsFolderPath}");
+                }
+
+                string[] datFiles = Directory.GetFiles(assetsFolderPath, "*.dat");
+                Log($"Found {datFiles.Length} DAT files in {assetsFolderPath}");
+                foreach (var file in datFiles)
+                {
+                    Log($"DAT file: {file}");
+                }
+
                 _assetManager = new AssetManager(assetsFolderPath);
                 await _assetManager.LoadAssetsAsync();
                 UpdateAssetBrowser();
-                Console.WriteLine("Assets loaded successfully");
+                Log("Assets loaded successfully");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error initializing or loading assets: {ex.Message}");
-                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                Log($"Error initializing or loading assets: {ex.Message}");
+                Log($"Stack Trace: {ex.StackTrace}");
                 throw;
             }
         }
