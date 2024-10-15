@@ -1,6 +1,9 @@
+// AsheronBuilder.UI/ViewModels/DungeonLayoutViewModel.cs
+
 using System.Collections.ObjectModel;
 using AsheronBuilder.Core.Dungeon;
 using System.Linq;
+using OpenTK.Mathematics;
 
 namespace AsheronBuilder.UI.ViewModels
 {
@@ -61,11 +64,17 @@ namespace AsheronBuilder.UI.ViewModels
     {
         public uint Id { get; }
         public uint EnvironmentId { get; }
+        public Vector3 Position { get; set; }
+        public Quaternion Rotation { get; set; }
+        public Vector3 Scale { get; set; }
 
         public EnvCellViewModel(EnvCell envCell)
         {
             Id = envCell.Id;
             EnvironmentId = envCell.EnvironmentId;
+            Position = envCell.Position;
+            Rotation = envCell.Rotation;
+            Scale = envCell.Scale;
         }
     }
 }

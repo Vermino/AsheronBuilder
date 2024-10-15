@@ -1,82 +1,407 @@
 // AsheronBuilder.UI/MainWindow.xaml.cs
+
 using System;
-using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Controls;
+using System.Windows.Input;
+using AsheronBuilder.Core;
 using AsheronBuilder.Core.Assets;
 using AsheronBuilder.Core.Dungeon;
 using AsheronBuilder.Rendering;
+using AsheronBuilder.Core.Commands;
+using AsheronBuilder.Core.Utils;
+using AsheronBuilder.UI.Utils;
+using OpenTK.Mathematics;
 using Microsoft.Win32;
-using System.Diagnostics;
-using System.Linq;
+using AsheronBuilder.Core.Landblock;
+using CommandManager = AsheronBuilder.Core.Commands.CommandManager;
+using Quaternion = OpenTK.Mathematics.Quaternion;
+using Vector2 = OpenTK.Mathematics.Vector2;
+using Vector3 = OpenTK.Mathematics.Vector3;
+
 
 namespace AsheronBuilder.UI
 {
     public partial class MainWindow : Window
     {
+        private LandblockManager _landblockManager;
+        private uint _currentLandblockId;
         private AssetManager _assetManager;
         private DungeonLayout _dungeonLayout;
+        private CommandManager _commandManager;
         private ManipulationMode _currentMode;
         private bool _snapToGrid;
+        private bool _showWireframe;
+        private bool _showCollision;
         private EnvCell _selectedEnvCell;
-
+        private Point _lastMousePosition;
+        private Camera _camera;
+        
+        
         public MainWindow()
         {
             InitializeComponent();
-            // InitializeAssetManager();
-            InitializeDungeonLayout();
-            // LoadAssets();
-            
-            _currentMode = ManipulationMode.Move;
-            _snapToGrid = false;
-            MoveButton.IsChecked = true;
+            _commandManager = new CommandManager();
+            _camera = new Camera(new Vector3(0, 5, 10), 1.0f);
+
+            InitializeAsync();
+
+            try
+            {
+                InitializeAssetManager();
+                InitializeDungeonLayout();
+                LoadAssetsAsync();
+                
+                _currentMode = ManipulationMode.Move;
+                _snapToGrid = false;
+                _showWireframe = false;
+                _showCollision = false;
+
+                SetupEventHandlers();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred during initialization: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        private void InitializeLandblockManager()
+        {
+            _landblockManager = new LandblockManager();
+            _currentLandblockId = 0;
+            UpdateLandblockDisplay();
+        }
+        
+        private void UpdateLandblockDisplay()
+        {
+            LandblockInfoTextBlock.Text = $"0x{_currentLandblockId:X8}: (landblock) {_currentLandblockId} (0x{(_currentLandblockId >> 16):X4}, 0x{(_currentLandblockId & 0xFFFF):X4})";
         }
 
-        // TODO Need help connecting the DAT manager to Trevis DatReaderWriter Library
-        // private void InitializeAssetManager()
-        // {
-        //     _assetManager = new AssetManager(@"C:\Users\Vermino\RiderProjects\AsheronBuilder\Assets\client_cell_1.dat");
-        // }
+        private void LoadLandblock_Click(object sender, RoutedEventArgs e)
+        {
+            var landblock = _landblockManager.GetLandblock(_currentLandblockId);
+            MainViewport.SetLandblock(landblock);
+            UpdateLandblockDisplay();
+        }
+
+        private void SaveLandblock_Click(object sender, RoutedEventArgs e)
+        {
+            var landblock = MainViewport.GetCurrentLandblock();
+            if (landblock != null)
+            {
+                _landblockManager.SaveLandblock(landblock);
+                MessageBox.Show("Landblock saved successfully.", "Save Landblock", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        private void ClearLandblock_Click(object sender, RoutedEventArgs e)
+        {
+            _landblockManager.ClearLandblock(_currentLandblockId);
+            var landblock = _landblockManager.GetLandblock(_currentLandblockId);
+            MainViewport.SetLandblock(landblock);
+            UpdateLandblockDisplay();
+        }
+
+        private void GoToLandblock_Click(object sender, RoutedEventArgs e)
+        {
+            if (uint.TryParse(LandblockIdTextBox.Text, System.Globalization.NumberStyles.HexNumber, null, out uint landblockId))
+            {
+                _currentLandblockId = landblockId;
+                var landblock = _landblockManager.GetLandblock(_currentLandblockId);
+                MainViewport.SetLandblock(landblock);
+                UpdateLandblockDisplay();
+            }
+            else
+            {
+                MessageBox.Show("Invalid landblock ID. Please enter a valid hexadecimal number.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        private async void InitializeAsync()
+        {
+            try
+            {
+                await InitializeAssetManager();
+                InitializeDungeonLayout();
+            
+                _currentMode = ManipulationMode.Move;
+                _snapToGrid = false;
+                _showWireframe = false;
+                _showCollision = false;
+
+                SetupEventHandlers();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"An error occurred during initialization: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task InitializeAssetManager()
+        {
+            try
+            {
+                string assetsFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
+                Console.WriteLine($"Full assets folder path: {Path.GetFullPath(assetsFolderPath)}");
+                _assetManager = new AssetManager(assetsFolderPath);
+                await _assetManager.LoadAssetsAsync();
+                UpdateAssetBrowser();
+                Console.WriteLine("Assets loaded successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing or loading assets: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                throw;
+            }
+        }
+        
+        private async void LoadAssetsAsync()
+        {
+            var loadingDialog = new LoadingDialog();
+            loadingDialog.Show();
+
+            try
+            {
+                await _assetManager.LoadAssetsAsync();
+                UpdateAssetBrowser();
+                Logger.Log("Assets loaded successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error loading assets", ex);
+                MessageBox.Show($"Error loading assets: {ex.Message}", "Asset Loading Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                loadingDialog.Close();
+            }
+        }
+
+        private void SaveDungeon_Click(object sender, RoutedEventArgs e)
+        {
+            var saveFileDialog = new SaveFileDialog
+            {
+                Filter = "Dungeon Files (*.dungeon)|*.dungeon",
+                DefaultExt = "dungeon"
+            };
+
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    DungeonSerializer.SaveDungeon(_dungeonLayout, saveFileDialog.FileName);
+                    Logger.Log($"Dungeon saved successfully to: {saveFileDialog.FileName}");
+                    MessageBox.Show("Dungeon saved successfully!", "Save Dungeon", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to save dungeon", ex);
+                    MessageBox.Show($"Failed to save dungeon: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void OpenDungeon_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Filter = "Dungeon Files (*.dungeon)|*.dungeon",
+                DefaultExt = "dungeon"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    _dungeonLayout = DungeonSerializer.LoadDungeon(openFileDialog.FileName);
+                    UpdateViewports();
+                    UpdateDungeonHierarchy();
+                    Logger.Log($"Dungeon loaded successfully from: {openFileDialog.FileName}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to load dungeon", ex);
+                    MessageBox.Show($"Failed to load dungeon: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
 
         private void InitializeDungeonLayout()
         {
             _dungeonLayout = new DungeonLayout();
-            UpdateHierarchyTreeView();
+            // Add some sample EnvCells for demonstration
+            _dungeonLayout.AddEnvCell(new EnvCell(1) { Position = new Vector3(0, 0, 0), Scale = Vector3.One });
+            _dungeonLayout.AddEnvCell(new EnvCell(2) { Position = new Vector3(2, 0, 2), Scale = Vector3.One * 1.5f });
+            _dungeonLayout.AddEnvCell(new EnvCell(3) { Position = new Vector3(-2, 0, -2), Scale = Vector3.One * 0.8f });
+
+            UpdateViewports();
+        }
+
+        private void SetupEventHandlers()
+        {
+            MainViewport.MouseMove += MainViewport_MouseMove;
+            MainViewport.MouseDown += MainViewport_MouseDown;
+            MainViewport.MouseUp += MainViewport_MouseUp;
+            MainViewport.MouseWheel += MainViewport_MouseWheel;
+
+            AssetBrowserTreeView.SelectedItemChanged += AssetBrowserTreeView_SelectedItemChanged;
+            DungeonHierarchyTreeView.SelectedItemChanged += DungeonHierarchyTreeView_SelectedItemChanged;
+            
+            ResetViewButton.Click += ResetView_Click;
+            TopViewButton.Click += TopView_Click;
+            SelectObjectCheckBox.Checked += SelectObject_Checked;
+            SelectObjectCheckBox.Unchecked += SelectObject_Unchecked;
+            SelectVertexCheckBox.Checked += SelectVertex_Checked;
+            SelectVertexCheckBox.Unchecked += SelectVertex_Unchecked;
+            SelectFaceCheckBox.Checked += SelectFace_Checked;
+            SelectFaceCheckBox.Unchecked += SelectFace_Unchecked;
         }
         
-        // TODO Need help connecting the DAT manager to Trevis DatReaderWriter Library
-        // private void LoadAssets()
-        // {
-        //     var textures = _assetManager.GetTextureFileIds();
-        //     var models = _assetManager.GetModelFileIds();
-        //     var environments = _assetManager.GetEnvironmentFileIds();
-        //
-        //     var texturesNode = new TreeViewItem { Header = "Textures" };
-        //     foreach (var textureId in textures)
-        //     {
-        //         texturesNode.Items.Add(new TreeViewItem { Header = $"Texture {textureId}" });
-        //     }
-        //     AssetTreeView.Items.Add(texturesNode);
-        //
-        //     var modelsNode = new TreeViewItem { Header = "Models" };
-        //     foreach (var modelId in models)
-        //     {
-        //         modelsNode.Items.Add(new TreeViewItem { Header = $"Model {modelId}" });
-        //     }
-        //     AssetTreeView.Items.Add(modelsNode);
-        //
-        //     var environmentsNode = new TreeViewItem { Header = "Environments" };
-        //     foreach (var environmentId in environments)
-        //     {
-        //         environmentsNode.Items.Add(new TreeViewItem { Header = $"Environment {environmentId}" });
-        //     }
-        //     AssetTreeView.Items.Add(environmentsNode);
-        // }
-
-        private void UpdateHierarchyTreeView()
+        private EnvCell PickObject(MouseButtonEventArgs e)
         {
-            HierarchyTreeView.Items.Clear();
+            Point mousePosition = e.GetPosition(MainViewport);
+            Vector2 mousePos = new Vector2((float)mousePosition.X, (float)mousePosition.Y);
+            return MainViewport.PickObject(mousePos);
+        }
+        
+        private Vector3 CalculateNewPosition(Point currentPos)
+        {
+            Vector2 mousePos = currentPos.ToVector2();
+            Camera.Ray ray = _camera.GetPickingRay(mousePos, (float)MainViewport.ActualWidth, (float)MainViewport.ActualHeight);
+            Camera.Plane groundPlane = new Camera.Plane(Vector3.UnitY, 0);
+
+            if (ray.Intersects(groundPlane, out float distance))
+            {
+                return ray.Origin + ray.Direction * distance;
+            }
+
+            return _selectedEnvCell.Position;
+        }
+
+        private void SetPosition_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement position setting logic
+        }
+
+        private void SetScale_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement scale setting logic
+        }
+        
+        private void ResetView_Click(object sender, RoutedEventArgs e)
+        {
+            // Reset camera to default position and orientation
+            _camera.Position = new Vector3(0, 5, 10);
+            _camera.Yaw = -90f;
+            _camera.Pitch = 0f;
+            _camera.UpdateVectors();
+            MainViewport.InvalidateVisual();
+        }
+        
+        private void TopView_Click(object sender, RoutedEventArgs e)
+        {
+            // Set camera to top-down view
+            _camera.Position = new Vector3(0, 20, 0);
+            _camera.Yaw = -90f;
+            _camera.Pitch = -90f;
+            _camera.UpdateVectors();
+            MainViewport.InvalidateVisual();
+        }
+
+        private void SelectObject_Checked(object sender, RoutedEventArgs e)
+        {
+            _currentMode = ManipulationMode.Select;
+        }
+
+        private void SelectObject_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_currentMode == ManipulationMode.Select)
+            {
+                _currentMode = ManipulationMode.Move;
+            }
+        }
+
+        private void SelectVertex_Checked(object sender, RoutedEventArgs e)
+        {
+            // Implement vertex selection mode
+        }
+
+        private void SelectVertex_Unchecked(object sender, RoutedEventArgs e)
+        {
+            // Disable vertex selection mode
+        }
+
+        private void SelectFace_Checked(object sender, RoutedEventArgs e)
+        {
+            // Implement face selection mode
+        }
+
+        private void SelectFace_Unchecked(object sender, RoutedEventArgs e)
+        {
+            // Disable face selection mode
+        }
+
+        private void MainViewport_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                var currentPos = e.GetPosition(MainViewport);
+                if (_currentMode == ManipulationMode.Move && _selectedEnvCell != null)
+                {
+                    Vector3 newPosition = CalculateNewPosition(currentPos);
+                    var command = new MoveEnvCellCommand(_dungeonLayout, _selectedEnvCell, newPosition);
+                    _commandManager.ExecuteCommand(command);
+                    UpdateViewports();
+                }
+                else
+                {
+                    // Camera rotation
+                    _camera.HandleMouseInput((float)(currentPos.X - _lastMousePosition.X), 
+                                             (float)(currentPos.Y - _lastMousePosition.Y));
+                    MainViewport.InvalidateVisual();
+                }
+                _lastMousePosition = currentPos;
+            }
+        }
+
+        private void UpdateViewports()
+        {
+            MainViewport.SetDungeonLayout(_dungeonLayout);
+            MiniMap.SetDungeonLayout(_dungeonLayout);
+        }
+
+        private void UpdateAssetBrowser()
+        {
+            AssetBrowserTreeView.Items.Clear();
+
+            var texturesNode = new TreeViewItem { Header = "Textures" };
+            foreach (var textureId in _assetManager.GetAllTextureFileIds())
+            {
+                texturesNode.Items.Add(new TreeViewItem { Header = $"Texture {textureId}", Tag = textureId });
+            }
+            AssetBrowserTreeView.Items.Add(texturesNode);
+
+            var modelsNode = new TreeViewItem { Header = "Models" };
+            foreach (var modelId in _assetManager.GetAllModelFileIds())
+            {
+                modelsNode.Items.Add(new TreeViewItem { Header = $"Model {modelId}", Tag = modelId });
+            }
+            AssetBrowserTreeView.Items.Add(modelsNode);
+
+            var environmentsNode = new TreeViewItem { Header = "Environments" };
+            foreach (var environmentId in _assetManager.GetAllEnvironmentFileIds())
+            {
+                environmentsNode.Items.Add(new TreeViewItem { Header = $"Environment {environmentId}", Tag = environmentId });
+            }
+            AssetBrowserTreeView.Items.Add(environmentsNode);
+        }
+
+        private void UpdateDungeonHierarchy()
+        {
+            DungeonHierarchyTreeView.Items.Clear();
             AddAreaToTreeView(_dungeonLayout.Hierarchy.RootArea, null);
         }
 
@@ -86,7 +411,7 @@ namespace AsheronBuilder.UI
 
             if (parentItem == null)
             {
-                HierarchyTreeView.Items.Add(areaItem);
+                DungeonHierarchyTreeView.Items.Add(areaItem);
             }
             else
             {
@@ -104,315 +429,100 @@ namespace AsheronBuilder.UI
                 areaItem.Items.Add(envCellItem);
             }
         }
+        
+        
 
-        private void OpenGLControl_MouseDown(object sender, MouseButtonEventArgs e)
+        private void MainViewport_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed)
+            if (e.ChangedButton == MouseButton.Left)
             {
-                var mousePosition = e.GetPosition(OpenGLControl);
-                _selectedEnvCell = PickEnvCell(mousePosition);
-                if (_selectedEnvCell != null)
+                _lastMousePosition = e.GetPosition(MainViewport);
+                if (_currentMode == ManipulationMode.Select)
                 {
-                    UpdatePropertiesPanel(_selectedEnvCell);
-                }
-            }
-            OpenGLControl.Focus();
-        }
-
-        private void OpenGLControl_MouseMove(object sender, MouseEventArgs e)
-        {
-            ((OpenGLControl)sender).OnMouseMove(sender, e);
-            if (e.LeftButton == MouseButtonState.Pressed && _selectedEnvCell != null)
-            {
-                var mousePosition = e.GetPosition(OpenGLControl);
-                var worldPosition = ScreenToWorldPosition(mousePosition);
-
-                switch (_currentMode)
-                {
-                    case ManipulationMode.Move:
-                        MoveSelectedEnvCell(worldPosition);
-                        break;
-                    case ManipulationMode.Rotate:
-                        RotateSelectedEnvCell(worldPosition);
-                        break;
-                    case ManipulationMode.Scale:
-                        ScaleSelectedEnvCell(worldPosition);
-                        break;
+                   // _selectedEnvCell = MainViewport.PickObject(_lastMousePosition);
+                    UpdatePropertyPanel();
                 }
             }
         }
+        
 
-        private void OpenGLControl_MouseUp(object sender, MouseButtonEventArgs e)
+        private void MainViewport_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            ((OpenGLControl)sender).OnMouseUp(sender, e);
-            _selectedEnvCell = null;
-        }
-
-        private void OpenGLControl_MouseLeave(object sender, MouseEventArgs e)
-        {
-            ((OpenGLControl)sender).OnMouseLeave(sender, e);
-        }
-
-        private void OpenGLControl_KeyDown(object sender, KeyEventArgs e)
-        {
-            ((OpenGLControl)sender).OnKeyDown(sender, e);
-            switch (e.Key)
+            if (e.ChangedButton == MouseButton.Left)
             {
-                case Key.Delete:
-                    DeleteSelectedEnvCell();
-                    break;
+                // Finish any ongoing operations
             }
         }
 
-        private void OpenGLControl_KeyUp(object sender, KeyEventArgs e)
+        private void MainViewport_MouseWheel(object sender, MouseWheelEventArgs e)
         {
-            ((OpenGLControl)sender).OnKeyUp(sender, e);
+            MainViewport.ZoomCamera(e.Delta * 0.001f);
         }
 
-        private void ManipulationMode_Checked(object sender, RoutedEventArgs e)
+        private void AssetBrowserTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            if (sender == MoveButton) _currentMode = ManipulationMode.Move;
-            else if (sender == RotateButton) _currentMode = ManipulationMode.Rotate;
-            else if (sender == ScaleButton) _currentMode = ManipulationMode.Scale;
-        }
-
-        private void SnapToGridButton_Checked(object sender, RoutedEventArgs e)
-        {
-            _snapToGrid = true;
-        }
-
-        private void SnapToGridButton_Unchecked(object sender, RoutedEventArgs e)
-        {
-            _snapToGrid = false;
-        }
-
-        private EnvCell PickEnvCell(Point mousePosition)
-        {
-            // Implement ray casting to pick EnvCell
-            // This is a placeholder implementation
-            return _dungeonLayout.Hierarchy.RootArea.GetAllAreas()
-                .SelectMany(a => a.EnvCells)
-                .FirstOrDefault();
-        }
-
-        private System.Numerics.Vector3 ScreenToWorldPosition(Point screenPosition)
-        {
-            // Implement screen to world position conversion
-            // This is a placeholder implementation
-            return new System.Numerics.Vector3((float)screenPosition.X, (float)screenPosition.Y, 0);
-        }
-
-        private void MoveSelectedEnvCell(System.Numerics.Vector3 worldPosition)
-        {
-            if (_snapToGrid)
+            if (e.NewValue is TreeViewItem item && item.Tag is uint assetId)
             {
-                worldPosition = SnapToGrid(worldPosition);
-            }
-            _selectedEnvCell.Position = worldPosition;
-            UpdatePropertiesPanel(_selectedEnvCell);
-            ((OpenGLControl)OpenGLControl).Invalidate();
-        }
-
-        private void RotateSelectedEnvCell(System.Numerics.Vector3 worldPosition)
-        {
-            // Implement rotation logic
-            // This is a placeholder implementation
-            var rotation = System.Numerics.Quaternion.CreateFromYawPitchRoll(0.1f, 0, 0);
-            _selectedEnvCell.Rotation = rotation;
-            UpdatePropertiesPanel(_selectedEnvCell);
-            ((OpenGLControl)OpenGLControl).Invalidate();
-        }
-
-        private void ScaleSelectedEnvCell(System.Numerics.Vector3 worldPosition)
-        {
-            // Implement scaling logic
-            // This is a placeholder implementation
-            var scale = new System.Numerics.Vector3(1.1f, 1.1f, 1.1f);
-            _selectedEnvCell.Scale = scale;
-            UpdatePropertiesPanel(_selectedEnvCell);
-            ((OpenGLControl)OpenGLControl).Invalidate();
-        }
-
-        private void DeleteSelectedEnvCell()
-        {
-            if (_selectedEnvCell != null)
-            {
-                _dungeonLayout.RemoveEnvCell(_selectedEnvCell.Id);
-                _selectedEnvCell = null;
-                UpdateHierarchyTreeView();
-                ClearPropertiesPanel();
-                ((OpenGLControl)OpenGLControl).Invalidate();
+                // Display asset properties or preview
             }
         }
 
-        private System.Numerics.Vector3 SnapToGrid(System.Numerics.Vector3 position)
+        private void DungeonHierarchyTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
-            float gridSize = 1.0f; // Adjust this value to change the grid size
-            return new System.Numerics.Vector3(
-                (float)Math.Round(position.X / gridSize) * gridSize,
-                (float)Math.Round(position.Y / gridSize) * gridSize,
-                (float)Math.Round(position.Z / gridSize) * gridSize
-            );
-        }
-
-        private void UpdatePropertiesPanel(EnvCell envCell)
-        {
-            PropertiesPanel.Children.Clear();
-            PropertiesPanel.Children.Add(new TextBlock { Text = "EnvCell Properties", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 10) });
-
-            AddProperty("ID", envCell.Id.ToString(), false);
-            AddProperty("Environment ID", envCell.EnvironmentId.ToString());
-            AddProperty("Position X", envCell.Position.X.ToString());
-            AddProperty("Position Y", envCell.Position.Y.ToString());
-            AddProperty("Position Z", envCell.Position.Z.ToString());
-            AddProperty("Rotation X", envCell.Rotation.X.ToString());
-            AddProperty("Rotation Y", envCell.Rotation.Y.ToString());
-            AddProperty("Rotation Z", envCell.Rotation.Z.ToString());
-            AddProperty("Rotation W", envCell.Rotation.W.ToString());
-            AddProperty("Scale X", envCell.Scale.X.ToString());
-            AddProperty("Scale Y", envCell.Scale.Y.ToString());
-            AddProperty("Scale Z", envCell.Scale.Z.ToString());
-        }
-
-        private void AddProperty(string label, string value, bool isEditable = true)
-        {
-            var container = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 5) };
-            container.Children.Add(new TextBlock { Text = label + ": ", Width = 100 });
-            if (isEditable)
+            if (e.NewValue is TreeViewItem item)
             {
-                var textBox = new TextBox { Text = value, Width = 100 };
-                textBox.TextChanged += (sender, e) => UpdateEnvCellProperty(label, ((TextBox)sender).Text);
-                container.Children.Add(textBox);
+                if (item.Tag is DungeonArea area)
+                {
+                    // Display area properties
+                }
+                else if (item.Tag is EnvCell envCell)
+                {
+                    _selectedEnvCell = envCell;
+                    UpdatePropertyPanel();
+                }
             }
-            else
-            {
-                container.Children.Add(new TextBlock { Text = value, Width = 100 });
-            }
-            PropertiesPanel.Children.Add(container);
         }
 
-        private void UpdateEnvCellProperty(string property, string value)
+        private void UpdatePropertyPanel()
+        {
+            if (_selectedEnvCell == null)
+            {
+                // Hide or clear property panel
+                return;
+            }
+
+            // Update property panel with _selectedEnvCell properties
+            ObjectNameTextBox.Text = $"EnvCell {_selectedEnvCell.Id}";
+            ObjectTypeComboBox.SelectedItem = _selectedEnvCell.EnvironmentId.ToString();
+            XCoordTextBox.Text = _selectedEnvCell.Position.X.ToString("F2");
+            YCoordTextBox.Text = _selectedEnvCell.Position.Y.ToString("F2");
+            ZCoordTextBox.Text = _selectedEnvCell.Position.Z.ToString("F2");
+            // Update rotation and scale text boxes
+        }
+
+        private void ApplyObjectChanges_Click(object sender, RoutedEventArgs e)
         {
             if (_selectedEnvCell == null) return;
 
-            if (float.TryParse(value, out float floatValue))
-            {
-                switch (property)
-                {
-                    case "Environment ID":
-                        _selectedEnvCell.EnvironmentId = (uint)floatValue;
-                        break;
-                    case "Position X":
-                        _selectedEnvCell.Position = new System.Numerics.Vector3(floatValue, _selectedEnvCell.Position.Y, _selectedEnvCell.Position.Z);
-                        break;
-                    case "Position Y":
-                        _selectedEnvCell.Position = new System.Numerics.Vector3(_selectedEnvCell.Position.X, floatValue, _selectedEnvCell.Position.Z);
-                        break;
-                    case "Position Z":
-                        _selectedEnvCell.Position = new System.Numerics.Vector3(_selectedEnvCell.Position.X, _selectedEnvCell.Position.Y, floatValue);
-                        break;
-                    case "Rotation X":
-                        _selectedEnvCell.Rotation = new System.Numerics.Quaternion(floatValue, _selectedEnvCell.Rotation.Y, _selectedEnvCell.Rotation.Z, _selectedEnvCell.Rotation.W);
-                        break;
-                    case "Rotation Y":
-                        _selectedEnvCell.Rotation = new System.Numerics.Quaternion(_selectedEnvCell.Rotation.X, floatValue, _selectedEnvCell.Rotation.Z, _selectedEnvCell.Rotation.W);
-                        break;
-                    case "Rotation Z":
-                        _selectedEnvCell.Rotation = new System.Numerics.Quaternion(_selectedEnvCell.Rotation.X, _selectedEnvCell.Rotation.Y, floatValue, _selectedEnvCell.Rotation.W);
-                        break;
-                    case "Rotation W":
-                        _selectedEnvCell.Rotation = new System.Numerics.Quaternion(_selectedEnvCell.Rotation.X, _selectedEnvCell.Rotation.Y, _selectedEnvCell.Rotation.Z, floatValue);
-                        break;
-                    case "Scale X":
-                        _selectedEnvCell.Scale = new System.Numerics.Vector3(floatValue, _selectedEnvCell.Scale.Y, _selectedEnvCell.Scale.Z);
-                        break;
-                    case "Scale Y":
-                        _selectedEnvCell.Scale = new System.Numerics.Vector3(_selectedEnvCell.Scale.X, floatValue, _selectedEnvCell.Scale.Z);
-                        break;
-                    case "Scale Z":
-                        _selectedEnvCell.Scale = new System.Numerics.Vector3(_selectedEnvCell.Scale.X, _selectedEnvCell.Scale.Y, floatValue);
-                        break;
-                }
+            var newPosition = new Vector3(
+                float.Parse(XCoordTextBox.Text),
+                float.Parse(YCoordTextBox.Text),
+                float.Parse(ZCoordTextBox.Text)
+            );
 
-                _dungeonLayout.UpdateEnvCell(_selectedEnvCell);
-                ((OpenGLControl)OpenGLControl).Invalidate();
-            }
-        }
+            var command = new MoveEnvCellCommand(_dungeonLayout, _selectedEnvCell, newPosition);
+            _commandManager.ExecuteCommand(command);
 
-        private void ClearPropertiesPanel()
-        {
-            PropertiesPanel.Children.Clear();
-            PropertiesPanel.Children.Add(new TextBlock { Text = "No EnvCell selected" });
-        }
+            // Apply rotation and scale changes
 
-        private void HierarchyTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
-        {
-            var selectedItem = e.NewValue as TreeViewItem;
-            if (selectedItem != null)
-            {
-                if (selectedItem.Tag is DungeonArea)
-                {
-                    EnableAreaContextMenu();
-                }
-                else if (selectedItem.Tag is EnvCell)
-                {
-                    EnableEnvCellContextMenu();
-                    _selectedEnvCell = selectedItem.Tag as EnvCell;
-                    UpdatePropertiesPanel(_selectedEnvCell);
-                }
-            }
-        }
-
-        private void EnableAreaContextMenu()
-        {
-            AreaContextMenu.IsEnabled = true;
-        }
-
-        private void EnableEnvCellContextMenu()
-        {
-            AreaContextMenu.IsEnabled = false;
+            UpdateViewports();
         }
 
         private void NewDungeon_Click(object sender, RoutedEventArgs e)
         {
             _dungeonLayout = new DungeonLayout();
-            UpdateHierarchyTreeView();
-            ClearPropertiesPanel();
-            ((OpenGLControl)OpenGLControl).Invalidate();
-        }
-
-        private void LoadDungeon_Click(object sender, RoutedEventArgs e)
-        {
-            var openFileDialog = new OpenFileDialog
-            {
-                Filter = "Dungeon Files (*.dungeon)|*.dungeon",
-                DefaultExt = "dungeon"
-            };
-
-            if (openFileDialog.ShowDialog() == true)
-            {
-                _dungeonLayout = DungeonSerializer.LoadDungeon(openFileDialog.FileName);
-                UpdateHierarchyTreeView();
-                ClearPropertiesPanel();
-                ((OpenGLControl)OpenGLControl).Invalidate();
-                MessageBox.Show("Dungeon loaded successfully.", "Load Dungeon", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
-        }
-
-        private void SaveDungeon_Click(object sender, RoutedEventArgs e)
-        {
-            var saveFileDialog = new SaveFileDialog
-            {
-                Filter = "Dungeon Files (*.dungeon)|*.dungeon",
-                DefaultExt = "dungeon",
-                AddExtension = true
-            };
-
-            if (saveFileDialog.ShowDialog() == true)
-            {
-                DungeonSerializer.SaveDungeon(_dungeonLayout, saveFileDialog.FileName);
-                MessageBox.Show("Dungeon saved successfully.", "Save Dungeon", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
+            UpdateViewports();
+            UpdateDungeonHierarchy();
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)
@@ -422,82 +532,108 @@ namespace AsheronBuilder.UI
 
         private void Undo_Click(object sender, RoutedEventArgs e)
         {
-            // Implement undo functionality
+            _commandManager.Undo();
+            UpdateViewports();
+            UpdatePropertyPanel();
         }
 
         private void Redo_Click(object sender, RoutedEventArgs e)
         {
-            // Implement redo functionality
+            _commandManager.Redo();
+            UpdateViewports();
+            UpdatePropertyPanel();
         }
 
         private void ToggleGrid_Click(object sender, RoutedEventArgs e)
         {
-            // Implement grid toggling
+            MainViewport.ToggleGrid();
         }
 
-        private void RenameArea_Click(object sender, RoutedEventArgs e)
+        private void ManipulationTool_Checked(object sender, RoutedEventArgs e)
         {
-            var selectedItem = HierarchyTreeView.SelectedItem as TreeViewItem;
-            if (selectedItem != null && selectedItem.Tag is DungeonArea area)
+            if (sender is RadioButton radioButton)
             {
-                var dialog = new RenameDialog(area.Name);
-                if (dialog.ShowDialog() == true)
-                {
-                    string oldPath = GetAreaPath(selectedItem);
-                    _dungeonLayout.Hierarchy.RenameArea(oldPath, dialog.NewName);
-                    UpdateHierarchyTreeView();
-                }
+                _currentMode = (ManipulationMode)Enum.Parse(typeof(ManipulationMode), radioButton.Tag.ToString());
             }
         }
 
-        private void MoveArea_Click(object sender, RoutedEventArgs e)
+        private void SnapToGrid_Checked(object sender, RoutedEventArgs e)
         {
-            var selectedItem = HierarchyTreeView.SelectedItem as TreeViewItem;
-            if (selectedItem != null && selectedItem.Tag is DungeonArea area)
-            {
-                var dialog = new MoveDialog(GetAreaPath(selectedItem), _dungeonLayout.Hierarchy);
-                if (dialog.ShowDialog() == true)
-                {
-                    string sourcePath = GetAreaPath(selectedItem);
-                    _dungeonLayout.Hierarchy.MoveArea(sourcePath, dialog.DestinationPath);
-                    UpdateHierarchyTreeView();
-                }
-            }
+            _snapToGrid = true;
+        }
+
+        private void SnapToGrid_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _snapToGrid = false;
+        }
+
+        private void ShowWireframe_Checked(object sender, RoutedEventArgs e)
+        {
+            _showWireframe = true;
+            MainViewport.SetWireframeMode(true);
+        }
+
+        private void ShowWireframe_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _showWireframe = false;
+            MainViewport.SetWireframeMode(false);
+        }
+
+        private void ShowCollision_Checked(object sender, RoutedEventArgs e)
+        {
+            _showCollision = true;
+            MainViewport.SetCollisionVisibility(true);
+        }
+
+        private void ShowCollision_Unchecked(object sender, RoutedEventArgs e)
+        {
+            _showCollision = false;
+            MainViewport.SetCollisionVisibility(false);
         }
 
         private void AddEnvCell_Click(object sender, RoutedEventArgs e)
         {
-            var selectedItem = HierarchyTreeView.SelectedItem as TreeViewItem;
-            if (selectedItem != null && selectedItem.Tag is DungeonArea area)
+            var addEnvCellDialog = new AddEnvCellDialog(_assetManager);
+            if (addEnvCellDialog.ShowDialog() == true)
             {
-                var envCell = new EnvCell(1); // Use a default EnvironmentId of 1
-                string areaPath = GetAreaPath(selectedItem);
-                _dungeonLayout.AddEnvCell(envCell, areaPath);
-                UpdateHierarchyTreeView();
+                var newEnvCell = new EnvCell(addEnvCellDialog.SelectedEnvironmentId)
+                {
+                    Position = new Vector3(0, 0, 0),
+                    Rotation = Quaternion.Identity,
+                    Scale = Vector3.One
+                };
+                var command = new AddEnvCellCommand(_dungeonLayout, newEnvCell, "Root");
+                _commandManager.ExecuteCommand(command);
+                UpdateViewports();
+                UpdateDungeonHierarchy();
             }
         }
 
-        private void AddArea_Click(object sender, RoutedEventArgs e)
+        private void DeleteEnvCell_Click(object sender, RoutedEventArgs e)
         {
-            var dialog = new InputDialog("Add Area", "Enter area name:");
-            if (dialog.ShowDialog() == true)
+            if (_selectedEnvCell != null)
             {
-                var selectedItem = HierarchyTreeView.SelectedItem as TreeViewItem;
-                string parentPath = selectedItem != null ? GetAreaPath(selectedItem) : "";
-                _dungeonLayout.Hierarchy.GetOrCreateArea(parentPath + "/" + dialog.InputText);
-                UpdateHierarchyTreeView();
+                var command = new RemoveEnvCellCommand(_dungeonLayout, _selectedEnvCell, GetEnvCellPath(_selectedEnvCell));
+                _commandManager.ExecuteCommand(command);
+                _selectedEnvCell = null;
+                UpdateViewports();
+                UpdateDungeonHierarchy();
+                UpdatePropertyPanel();
             }
         }
 
-        private string GetAreaPath(TreeViewItem item)
+        private string GetEnvCellPath(EnvCell envCell)
         {
-            var path = new List<string>();
-            while (item != null && item.Tag is DungeonArea)
-            {
-                path.Insert(0, ((DungeonArea)item.Tag).Name);
-                item = item.Parent as TreeViewItem;
-            }
-            return string.Join("/", path);
+            // Implement this method to find the path of the EnvCell in the dungeon hierarchy
+            return "Root";
+        }
+    }
+    
+    public static class PointExtensions
+    {
+        public static Vector2 ToVector2(this Point point)
+        {
+            return new Vector2((float)point.X, (float)point.Y);
         }
     }
 
@@ -505,6 +641,7 @@ namespace AsheronBuilder.UI
     {
         Move,
         Rotate,
-        Scale
+        Scale,
+        Select
     }
 }

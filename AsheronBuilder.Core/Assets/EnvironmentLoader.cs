@@ -1,8 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Numerics;
 using System.Diagnostics;
+using OpenTK.Mathematics;
+using AsheronBuilder.Core.Utils;
 
 namespace AsheronBuilder.Core.Assets
 {
@@ -57,8 +58,8 @@ namespace AsheronBuilder.Core.Assets
                         Vector3 vertex = new Vector3(x, y, z);
                         environmentData.Vertices.Add(vertex);
 
-                        min = Vector3.Min(min, vertex);
-                        max = Vector3.Max(max, vertex);
+                        min = min.Min(vertex);
+                        max = max.Max(vertex);
 
                         if (i < 5 || i > vertexCount - 5)
                         {

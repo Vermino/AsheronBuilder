@@ -1,12 +1,24 @@
 // AsheronBuilder.UI/ViewModels/MainViewModel.cs
+
 using AsheronBuilder.Core.Assets;
 using AsheronBuilder.Core.Dungeon;
 using System.IO;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using AsheronBuilder.Core;
+using OpenTK.Mathematics;
 
 namespace AsheronBuilder.UI.ViewModels
 {
-    public class MainViewModel
+    public class MainViewModel : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        }
+
         public AssetBrowserViewModel AssetBrowser { get; }
         public DungeonLayoutViewModel DungeonLayout { get; }
 
@@ -52,17 +64,31 @@ namespace AsheronBuilder.UI.ViewModels
             _dungeonLayout.RemoveEnvCell(envCellId);
             DungeonLayout.UpdateAreas();
         }
-
-        public void MoveArea(string sourcePath, string destinationPath)
+        
+        public void MoveArea(DungeonArea area, Vector3 newPosition)
         {
-            _dungeonLayout.Hierarchy.MoveArea(sourcePath, destinationPath);
-            DungeonLayout.UpdateAreas();
+            Vector3 delta = newPosition - area.Position;
+            area.Position = newPosition;
+    
+            // Update all EnvCells within the area
+            foreach (var envCell in area.EnvCells)
+            {
+                envCell.Position += delta;
+            }
+    
+            // Recursively update child areas
+            foreach (var childArea in area.ChildAreas)
+            {
+                MoveArea(childArea, childArea.Position + delta);
+            }
+    
+            OnPropertyChanged(nameof(DungeonLayout));
         }
 
-        public void RenameArea(string path, string newName)
+        public void RenameArea(DungeonArea area, string newName)
         {
-            _dungeonLayout.Hierarchy.RenameArea(path, newName);
-            DungeonLayout.UpdateAreas();
+            area.Name = newName;
+            OnPropertyChanged(nameof(DungeonLayout));
         }
     }
 }

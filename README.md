@@ -35,6 +35,4 @@ AsheronBuilder is a tool for creating and editing dungeons for Asheron's Call. I
 
 ## Contributing
 
-Please read CONTRIBUTING.md for details on our code of conduct and the process for submitting pull requests.
-
-## License
+Please read CONTRIBUTING.md for details on our code of conduct and the process for submitting pull requests

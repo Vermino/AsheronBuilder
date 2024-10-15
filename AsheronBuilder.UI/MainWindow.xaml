@@ -6,24 +6,24 @@
         xmlns:local="clr-namespace:AsheronBuilder.UI"
         xmlns:rendering="clr-namespace:AsheronBuilder.Rendering;assembly=AsheronBuilder.Rendering"
         mc:Ignorable="d"
-        Title="Asheron Builder" Height="720" Width="1280">
+        Title="AC World Builder v3.3.1" Height="720" Width="1280"
+        Background="#800000">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="200"/>
+        </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200"/>
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="250"/>
         </Grid.ColumnDefinitions>
 
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-
         <!-- Menu -->
-        <Menu Grid.ColumnSpan="3">
+        <Menu Grid.ColumnSpan="2" Background="#800000" Foreground="White">
             <MenuItem Header="File">
                 <MenuItem Header="New" Click="NewDungeon_Click"/>
-                <MenuItem Header="Open" Click="LoadDungeon_Click"/>
+                <MenuItem Header="Open" Click="OpenDungeon_Click"/>
                 <MenuItem Header="Save" Click="SaveDungeon_Click"/>
                 <Separator/>
                 <MenuItem Header="Exit" Click="Exit_Click"/>
@@ -37,84 +37,123 @@
             </MenuItem>
         </Menu>
 
-        <!-- Asset Browser and Hierarchy -->
-        <Grid Grid.Row="1" Grid.Column="0">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+        <!-- Main 3D Viewport -->
+        <Border Grid.Row="1" BorderBrush="Black" BorderThickness="1" Margin="5">
+            <rendering:OpenGLControl x:Name="MainViewport"/>
+        </Border>
+
+        <!-- Right Panel -->
+        <StackPanel Grid.Row="1" Grid.Column="1" Margin="5">
+            <!-- Navigation Section -->
+            <GroupBox Header="Navigation" Foreground="White" BorderBrush="White">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <RadioButton Content="Move" Tag="Move" Checked="ManipulationTool_Checked" Foreground="White" Grid.Column="0" Grid.Row="0"/>
+                    <RadioButton Content="Rotate" Tag="Rotate" Checked="ManipulationTool_Checked" Foreground="White" Grid.Column="1" Grid.Row="0"/>
+                    <RadioButton Content="Scale" Tag="Scale" Checked="ManipulationTool_Checked" Foreground="White" Grid.Column="0" Grid.Row="1"/>
+                    <CheckBox Content="Snap to Grid" Checked="SnapToGrid_Checked" Unchecked="SnapToGrid_Unchecked" Foreground="White" Grid.Column="1" Grid.Row="1"/>
+                    <Button x:Name="ResetViewButton" Content="Reset View" Click="ResetView_Click" Grid.Column="0" Grid.Row="2" Margin="2"/>
+                    <Button x:Name="TopViewButton" Content="Top View" Click="TopView_Click" Grid.Column="1" Grid.Row="2" Margin="2"/>
+                </Grid>
+            </GroupBox>
+
+            <!-- Selection Section -->
+            <GroupBox Header="Selection" Foreground="White" BorderBrush="White">
+                <StackPanel>
+                    <CheckBox x:Name="SelectObjectCheckBox" Content="Select Object" Checked="SelectObject_Checked" Unchecked="SelectObject_Unchecked" Foreground="White"/>
+                    <CheckBox x:Name="SelectVertexCheckBox" Content="Select Vertex" Checked="SelectVertex_Checked" Unchecked="SelectVertex_Unchecked" Foreground="White"/>
+                    <CheckBox x:Name="SelectFaceCheckBox" Content="Select Face" Checked="SelectFace_Checked" Unchecked="SelectFace_Unchecked" Foreground="White"/>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Object Properties -->
+            <GroupBox Header="Object Properties" Foreground="White" BorderBrush="White">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Name:" Foreground="White" Grid.Column="0" Grid.Row="0"/>
+                    <TextBox x:Name="ObjectNameTextBox" Grid.Column="1" Grid.Row="0" Margin="2"/>
+                    <TextBlock Text="Type:" Foreground="White" Grid.Column="0" Grid.Row="1"/>
+                    <ComboBox x:Name="ObjectTypeComboBox" Grid.Column="1" Grid.Row="1" Margin="2"/>
+                    <TextBlock Text="Material:" Foreground="White" Grid.Column="0" Grid.Row="2"/>
+                    <ComboBox x:Name="MaterialComboBox" Grid.Column="1" Grid.Row="2" Margin="2"/>
+                    <Button Content="Apply Changes" Click="ApplyObjectChanges_Click" Grid.Column="1" Grid.Row="3" Margin="2"/>
+                </Grid>
+            </GroupBox>
 
             <!-- Asset Browser -->
-            <Grid Grid.Row="0">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-                <TextBlock Text="Asset Browser" FontWeight="Bold" Margin="5"/>
-                <TreeView x:Name="AssetTreeView" Grid.Row="1"/>
-            </Grid>
+            <GroupBox Header="Asset Browser" Foreground="White" BorderBrush="White">
+                <TreeView x:Name="AssetBrowserTreeView" Background="#400000" Foreground="White" BorderBrush="White"/>
+            </GroupBox>
 
             <!-- Dungeon Hierarchy -->
-            <Grid Grid.Row="1">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <TextBlock Text="Dungeon Hierarchy" FontWeight="Bold" Margin="5"/>
-                <TreeView x:Name="HierarchyTreeView" Grid.Row="1" SelectedItemChanged="HierarchyTreeView_SelectedItemChanged">
-                    <TreeView.ContextMenu>
-                        <ContextMenu x:Name="AreaContextMenu" IsEnabled="False">
-                            <MenuItem Header="Rename" Click="RenameArea_Click"/>
-                            <MenuItem Header="Move" Click="MoveArea_Click"/>
-                            <MenuItem Header="Add EnvCell" Click="AddEnvCell_Click"/>
-                        </ContextMenu>
-                    </TreeView.ContextMenu>
-                </TreeView>
-                <Button Content="Add Area" Grid.Row="2" Margin="5" Click="AddArea_Click"/>
-            </Grid>
-        </Grid>
+            <GroupBox Header="Dungeon Hierarchy" Foreground="White" BorderBrush="White">
+                <TreeView x:Name="DungeonHierarchyTreeView" Background="#400000" Foreground="White" BorderBrush="White"/>
+            </GroupBox>
+        </StackPanel>
 
-        <!-- 3D Viewport -->
-        <Grid Grid.Row="1" Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            
-            <!-- Manipulation Tools -->
-            <StackPanel Orientation="Horizontal" Grid.Row="0" Margin="5">
-                <RadioButton x:Name="MoveButton" Content="Move" Margin="5" Checked="ManipulationMode_Checked"/>
-                <RadioButton x:Name="RotateButton" Content="Rotate" Margin="5" Checked="ManipulationMode_Checked"/>
-                <RadioButton x:Name="ScaleButton" Content="Scale" Margin="5" Checked="ManipulationMode_Checked"/>
-                <ToggleButton x:Name="SnapToGridButton" Content="Snap to Grid" Margin="5" Checked="SnapToGridButton_Checked" Unchecked="SnapToGridButton_Unchecked"/>
+        <!-- Bottom Panel -->
+        <Grid Grid.Row="2" Grid.ColumnSpan="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="200"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="250"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- Mini-map -->
+            <Border Grid.Column="0" BorderBrush="Black" BorderThickness="1" Margin="5">
+                <rendering:OpenGLControl x:Name="MiniMap"/>
+            </Border>
+
+            <!-- Central bottom panel -->
+            <StackPanel Grid.Column="1" Orientation="Vertical" Margin="5">
+                <TextBlock Text="OpenGL content: Call Start() on the control to begin rendering." Foreground="White"/>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <TextBlock Text="X:" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBox x:Name="XCoordTextBox" Width="50" Margin="5,0"/>
+                    <TextBlock Text="Y:" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBox x:Name="YCoordTextBox" Width="50" Margin="5,0"/>
+                    <TextBlock Text="Z:" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBox x:Name="ZCoordTextBox" Width="50" Margin="5,0"/>
+                    <Button Content="Set Position" Click="SetPosition_Click" Margin="5,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <TextBlock Text="Scale:" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBox x:Name="ScaleTextBox" Width="50" Margin="5,0"/>
+                    <Button Content="Set Scale" Click="SetScale_Click" Margin="5,0"/>
+                </StackPanel>
             </StackPanel>
 
-            <!-- OpenGL Control -->
-            <Border Grid.Row="1" BorderBrush="Black" BorderThickness="1">
-                <rendering:OpenGLControl x:Name="OpenGLControl" 
-                                         Background="LightGray"
-                                         Focusable="True"
-                                         FocusVisualStyle="{x:Null}"
-                                         MouseDown="OpenGLControl_MouseDown"
-                                         MouseMove="OpenGLControl_MouseMove"
-                                         MouseUp="OpenGLControl_MouseUp"
-                                         MouseLeave="OpenGLControl_MouseLeave"
-                                         KeyDown="OpenGLControl_KeyDown"
-                                         KeyUp="OpenGLControl_KeyUp"/>
-            </Border>
-        </Grid>
-
-        <!-- Properties Panel -->
-        <Grid Grid.Row="1" Grid.Column="2">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            <TextBlock Text="Properties" FontWeight="Bold" Margin="5"/>
-            <ScrollViewer Grid.Row="1">
-                <StackPanel x:Name="PropertiesPanel"/>
-            </ScrollViewer>
+            <!-- Right bottom panel -->
+            <StackPanel Grid.Column="2" Margin="5">
+                <TextBlock Text="0x0: (landblock) 0 (0x0000, 0x0000, 0x0000)" Foreground="White" Margin="0,0,0,10"/>
+                <Button Content="Load" Margin="0,2" Background="LightGray" Click="LoadLandblock_Click"/>
+                <Button Content="Save" Margin="0,2" Background="LightGray" Click="SaveLandblock_Click"/>
+                <Button Content="Clear" Margin="0,2" Background="LightGray" Click="ClearLandblock_Click"/>
+                <Separator Margin="0,5"/>
+                <TextBlock x:Name="LandblockInfoTextBlock" Text="0x0: (landblock) 0 (0x0000, 0x0000, 0x0000)" Foreground="White" Margin="0,0,0,10"/>
+                <TextBox x:Name="LandblockIdTextBox" Margin="0,2"/>
+                <Button Content="Go To Landblock" Click="GoToLandblock_Click" Margin="0,2" Background="LightGray"/>
+                <Separator Margin="0,5"/>
+                <CheckBox Content="Show Wireframe" Checked="ShowWireframe_Checked" Unchecked="ShowWireframe_Unchecked" Foreground="White"/>
+                <CheckBox Content="Show Collision" Checked="ShowCollision_Checked" Unchecked="ShowCollision_Unchecked" Foreground="White"/>
+            </StackPanel>
         </Grid>
     </Grid>
 </Window>

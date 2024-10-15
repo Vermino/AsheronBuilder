@@ -1,225 +1,314 @@
 // AsheronBuilder.Rendering/OpenGLControl.cs
-using System;
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Threading;
-using AsheronBuilder.Core.Assets;
+
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
-using OpenTK.Windowing.Common;
-using OpenTK.Windowing.Desktop;
-using OpenTK.Windowing.GraphicsLibraryFramework;
-using Image = System.Windows.Controls.Image;
-using MouseButton = OpenTK.Windowing.GraphicsLibraryFramework.MouseButton;
-using PixelFormat = OpenTK.Graphics.OpenGL4.PixelFormat;
+using OpenTK.Wpf;
+using AsheronBuilder.Core.Dungeon;
+using AsheronBuilder.Core.Landblock;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Windows;
+using System.Windows.Threading;
 
 namespace AsheronBuilder.Rendering
 {
-    public class OpenGLControl : UserControl
+    public partial class OpenGLControl : GLWpfControl
     {
-        private Renderer _renderer;
-        private GameWindow _gameWindow;
-        private WriteableBitmap _writeableBitmap;
-        private Image _image;
-        private DispatcherTimer _renderTimer;
-        private int _framebuffer;
-        private int _texture;
+        private LandblockRenderer _landblockRenderer;
+        private Landblock _currentLandblock;
+        private bool _isInitialized = false;
+        private string _initializationError = null;
+        private DungeonLayout _currentDungeon;
+        private bool _showGrid = false;
+        private bool _wireframeMode = false;
+        private bool _showCollision = false;
+        private Camera _camera;
+        private Shader _shader;
+        private Shader _pickingShader;
+        private Dictionary<uint, (int VAO, int VBO, int EBO)> _envCellMeshes;
+        private int _pickingFramebuffer;
+        private int _pickingTexture;
+        private uint _selectedObjectId = 0;
 
-        public OpenGLControl()
+        public OpenGLControl() : base()
         {
-            _image = new Image();
-            Content = _image;
-
-            Loaded += OnLoaded;
-            SizeChanged += OnSizeChanged;
-
-            MouseMove += OnMouseMove;
-            MouseDown += OnMouseDown;
-            MouseUp += OnMouseUp;
-            MouseLeave += OnMouseLeave;
-            KeyDown += OnKeyDown;
-            KeyUp += OnKeyUp;
-        }
-
-        // TODO Movements keys stopped working in this iteration.
-        public void OnMouseMove(object sender, MouseEventArgs e)
-        {
-            var pos = e.GetPosition(this);
-            _renderer.OnMouseMove(new MouseMoveEventArgs((float)pos.X, (float)pos.Y, 0f, 0f));
-        }
-
-        public void OnMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (e.RightButton == MouseButtonState.Pressed)
+            GLWpfControlSettings settings = new GLWpfControlSettings
             {
-                _renderer.OnMouseDown(new OpenTK.Windowing.Common.MouseButtonEventArgs(MouseButton.Right, InputAction.Press, 0));
-                CaptureMouse();
-            }
-        }
-
-        public void OnMouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (e.RightButton == MouseButtonState.Released)
-            {
-                _renderer.OnMouseUp(new OpenTK.Windowing.Common.MouseButtonEventArgs(MouseButton.Right, InputAction.Release, 0));
-                ReleaseMouseCapture();
-            }
-        }
-
-        public void OnMouseLeave(object sender, MouseEventArgs e)
-        {
-            _renderer.OnMouseLeave();
-            ReleaseMouseCapture();
-        }
-
-        public void OnKeyDown(object sender, KeyEventArgs e)
-        {
-            _renderer.OnKeyDown(new KeyboardKeyEventArgs(MapKey(e.Key), 0, MapKeyModifiers(Keyboard.Modifiers), e.IsRepeat));
-        }
-
-        public void OnKeyUp(object sender, KeyEventArgs e)
-        {
-            _renderer.OnKeyUp(new KeyboardKeyEventArgs(MapKey(e.Key), 0, MapKeyModifiers(Keyboard.Modifiers), e.IsRepeat));
-        }
-
-        private Keys MapKey(Key key)
-        {
-            switch (key)
-            {
-                case Key.W: return Keys.W;
-                case Key.A: return Keys.A;
-                case Key.S: return Keys.S;
-                case Key.D: return Keys.D;
-                case Key.Space: return Keys.Space;
-                case Key.LeftShift: return Keys.LeftShift;
-                default: return Keys.Unknown;
-            }
-        }
-
-        private KeyModifiers MapKeyModifiers(ModifierKeys modifiers)
-        {
-            KeyModifiers result = 0;
-            if ((modifiers & ModifierKeys.Alt) != 0) result |= KeyModifiers.Alt;
-            if ((modifiers & ModifierKeys.Control) != 0) result |= KeyModifiers.Control;
-            if ((modifiers & ModifierKeys.Shift) != 0) result |= KeyModifiers.Shift;
-            return result;
-        }
-
-        private void OnLoaded(object sender, RoutedEventArgs e)
-        {
-            var gameWindowSettings = GameWindowSettings.Default;
-            var nativeWindowSettings = new NativeWindowSettings
-            {
-                Size = new Vector2i((int)ActualWidth, (int)ActualHeight),
-                WindowBorder = WindowBorder.Hidden,
-                StartVisible = false,
-                StartFocused = false,
-                API = ContextAPI.OpenGL,
-                Profile = ContextProfile.Core,
-                APIVersion = new Version(3, 3)
+                MajorVersion = 3,
+                MinorVersion = 3,
+                GraphicsProfile = OpenTK.Windowing.Common.ContextProfile.Core
             };
+            Start(settings);
 
-            try
+            _camera = new Camera(new Vector3(0, 5, 10), 1.0f); // set the aspect ratio later
+            _envCellMeshes = new Dictionary<uint, (int, int, int)>();
+            Render += OnRender;
+            SizeChanged += OpenGLControl_SizeChanged;
+        }
+        
+        private void OpenGLControl_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            _camera.AspectRatio = (float)(ActualWidth / ActualHeight);
+        }
+        
+        public void SetLandblock(Landblock landblock)
+        {
+            _currentLandblock = landblock;
+        }
+
+        public Landblock GetCurrentLandblock()
+        {
+            return _currentLandblock;
+        }
+
+        private void RenderLandblock()
+        {
+            if (_currentLandblock != null)
             {
-                _gameWindow = new GameWindow(gameWindowSettings, nativeWindowSettings);
-                _gameWindow.MakeCurrent();
-                Debug.WriteLine("OpenGL context created successfully");
-                Debug.WriteLine($"OpenGL version: {GL.GetString(StringName.Version)}");
+                _landblockRenderer.Render(_currentLandblock, _camera.GetViewMatrix(), _camera.GetProjectionMatrix());
             }
-            catch (Exception ex)
+        }
+
+        private void OnRender(TimeSpan obj)
+        {
+            if (!_isInitialized)
             {
-                Debug.WriteLine($"Failed to create OpenGL context: {ex.Message}");
+                try
+                {
+                    InitializeOpenGL();
+                    _isInitialized = true;
+                }
+                catch (Exception ex)
+                {
+                    _initializationError = ex.Message;
+                    Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+                    {
+                        MessageBox.Show($"Error initializing OpenGL: {_initializationError}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }));
+                    return;
+                }
+            }
+
+            if (_initializationError != null)
+            {
+                // Render an error message or blank screen
+                GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
                 return;
             }
 
-            _renderer = new Renderer(_gameWindow);
-            _renderer.Run();
+            // Your normal rendering code here
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            SetupFramebuffer();
+            _shader.Use();
 
-            _writeableBitmap =
-                new WriteableBitmap((int)ActualWidth, (int)ActualHeight, 96, 96, PixelFormats.Bgra32, null);
-            _image.Source = _writeableBitmap;
+            var view = _camera.GetViewMatrix();
+            var projection = _camera.GetProjectionMatrix();
 
-            _renderTimer = new DispatcherTimer();
-            _renderTimer.Interval = TimeSpan.FromMilliseconds(16); // ~60 FPS
-            _renderTimer.Tick += OnRenderTimer;
-            _renderTimer.Start();
-        }
+            _shader.SetMatrix4("view", view);
+            _shader.SetMatrix4("projection", projection);
 
-        private void SetupFramebuffer()
-        {
-            _framebuffer = GL.GenFramebuffer();
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, _framebuffer);
-
-            _texture = GL.GenTexture();
-            GL.BindTexture(TextureTarget.Texture2D, _texture);
-            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.Rgba, (int)ActualWidth, (int)ActualHeight, 0, PixelFormat.Rgba, PixelType.UnsignedByte, IntPtr.Zero);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
-            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
-
-            GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _texture, 0);
-
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
-        }
-
-        private void OnSizeChanged(object sender, SizeChangedEventArgs e)
-        {
-            if (_gameWindow != null)
+            if (_currentDungeon != null)
             {
-                _gameWindow.Size = new Vector2i((int)ActualWidth, (int)ActualHeight);
-                _renderer?.OnResize(new ResizeEventArgs((int)ActualWidth, (int)ActualHeight));
+                RenderDungeon(_currentDungeon);
+            }
 
-                _writeableBitmap = new WriteableBitmap((int)ActualWidth, (int)ActualHeight, 96, 96, PixelFormats.Bgra32, null);
-                _image.Source = _writeableBitmap;
-
-                SetupFramebuffer();
+            if (_showGrid)
+            {
+                RenderGrid();
             }
         }
+
+        private void InitializeOpenGL()
+        {
+            GL.ClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            GL.Enable(EnableCap.DepthTest);
+
+            _shader = new Shader("shader.vert", "shader.frag");
+            _pickingShader = new Shader("picking.vert", "picking.frag");
+
+            InitializePickingResources();
+        }
+
+        private void InitializePickingResources()
+        {
+            _pickingFramebuffer = GL.GenFramebuffer();
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, _pickingFramebuffer);
+
+            _pickingTexture = GL.GenTexture();
+            GL.BindTexture(TextureTarget.Texture2D, _pickingTexture);
+            GL.TexImage2D(TextureTarget.Texture2D, 0, PixelInternalFormat.R32ui, (int)ActualWidth, (int)ActualHeight, 0, PixelFormat.RedInteger, PixelType.UnsignedInt, IntPtr.Zero);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Nearest);
+            GL.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMinFilter.Nearest);
+            GL.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0, TextureTarget.Texture2D, _pickingTexture, 0);
+
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
+        }
+
+        private void RenderDungeon(DungeonLayout dungeon)
+        {
+            foreach (var envCell in dungeon.GetAllEnvCells())
+            {
+                if (!_envCellMeshes.ContainsKey(envCell.EnvironmentId))
+                {
+                    LoadEnvCellMesh(envCell.EnvironmentId);
+                }
+
+                var (vao, _, _) = _envCellMeshes[envCell.EnvironmentId];
+
+                var model = Matrix4.CreateScale(envCell.Scale) *
+                            Matrix4.CreateFromQuaternion(envCell.Rotation) *
+                            Matrix4.CreateTranslation(envCell.Position);
+
+                _shader.SetMatrix4("model", model);
+
+                GL.BindVertexArray(vao);
+                GL.DrawElements(PrimitiveType.Triangles, 36, DrawElementsType.UnsignedInt, 0);
+            }
+        }
+
+        private void LoadEnvCellMesh(uint environmentId)
+        {
+            // This is a placeholder. In a real implementation, you'd load the actual mesh data for the environment.
+            float[] vertices = {
+                // Front face
+                -0.5f, -0.5f,  0.5f,
+                 0.5f, -0.5f,  0.5f,
+                 0.5f,  0.5f,  0.5f,
+                -0.5f,  0.5f,  0.5f,
+                // Back face
+                -0.5f, -0.5f, -0.5f,
+                 0.5f, -0.5f, -0.5f,
+                 0.5f,  0.5f, -0.5f,
+                -0.5f,  0.5f, -0.5f,
+            };
+
+            uint[] indices = {
+                0, 1, 2, 2, 3, 0,
+                1, 5, 6, 6, 2, 1,
+                5, 4, 7, 7, 6, 5,
+                4, 0, 3, 3, 7, 4,
+                3, 2, 6, 6, 7, 3,
+                4, 5, 1, 1, 0, 4
+            };
+
+            int vao = GL.GenVertexArray();
+            int vbo = GL.GenBuffer();
+            int ebo = GL.GenBuffer();
+
+            GL.BindVertexArray(vao);
+
+            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+            GL.BufferData(BufferTarget.ArrayBuffer, vertices.Length * sizeof(float), vertices, BufferUsageHint.StaticDraw);
+
+            GL.BindBuffer(BufferTarget.ElementArrayBuffer, ebo);
+            GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Length * sizeof(uint), indices, BufferUsageHint.StaticDraw);
+
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
+            GL.EnableVertexAttribArray(0);
+
+            _envCellMeshes[environmentId] = (vao, vbo, ebo);
+        }
+
+        private void RenderGrid()
+        {
+            _shader.Use();
+            _shader.SetMatrix4("model", Matrix4.Identity);
+
+            int vao = GL.GenVertexArray();
+            GL.BindVertexArray(vao);
+
+            int vbo = GL.GenBuffer();
+            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+
+            List<float> gridVertices = new List<float>();
+            for (int i = -10; i <= 10; i++)
+            {
+                gridVertices.AddRange(new[] { i, 0f, -10f, 0.5f, 0.5f, 0.5f });
+                gridVertices.AddRange(new[] { i, 0f, 10f, 0.5f, 0.5f, 0.5f });
+                gridVertices.AddRange(new[] { -10f, 0f, i, 0.5f, 0.5f, 0.5f });
+                gridVertices.AddRange(new[] { 10f, 0f, i, 0.5f, 0.5f, 0.5f });
+            }
+
+            GL.BufferData(BufferTarget.ArrayBuffer, gridVertices.Count * sizeof(float), gridVertices.ToArray(), BufferUsageHint.StaticDraw);
+
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+            GL.EnableVertexAttribArray(0);
+
+            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+            GL.EnableVertexAttribArray(1);
+
+            GL.DrawArrays(PrimitiveType.Lines, 0, gridVertices.Count / 6);
+
+            GL.DeleteBuffer(vbo);
+            GL.DeleteVertexArray(vao);
+        }
+
+        public void SetDungeonLayout(DungeonLayout dungeonLayout)
+        {
+            _currentDungeon = dungeonLayout;
+        }
+
+        public void ToggleGrid()
+        {
+            _showGrid = !_showGrid;
+        }
+
+        public void SetWireframeMode(bool enabled)
+        {
+            _wireframeMode = enabled;
+            GL.PolygonMode(MaterialFace.FrontAndBack, _wireframeMode ? PolygonMode.Line : PolygonMode.Fill);
+        }
+
+        public void SetCollisionVisibility(bool visible)
+        {
+            _showCollision = visible;
+        }
         
-        public void Invalidate()
+
+        public void RotateCamera(float yaw, float pitch)
         {
-            _gameWindow.MakeCurrent();
-            _renderer.OnRenderFrame(new FrameEventArgs());
-            _gameWindow.SwapBuffers();
+            _camera.Yaw += yaw;
+            _camera.Pitch += pitch;
+            _camera.UpdateVectors();
         }
 
-        public void LoadEnvironment(EnvironmentLoader.EnvironmentData environmentData)
+        public void ZoomCamera(float zoomFactor)
         {
-            Debug.WriteLine($"OpenGLControl.LoadEnvironment called with {environmentData.Vertices.Count} vertices and {environmentData.Indices.Count} indices");
-            _renderer.LoadEnvironment(environmentData);
-            Debug.WriteLine("Environment data passed to Renderer");
+            _camera.Position += _camera.Front * zoomFactor;
         }
 
-        private void OnRenderTimer(object sender, EventArgs e)
+        public EnvCell PickObject(Vector2 mousePosition)
         {
-            Debug.WriteLine("Render timer tick");
-            _gameWindow.MakeCurrent();
-
+            GL.BindFramebuffer(FramebufferTarget.Framebuffer, _pickingFramebuffer);
             GL.Viewport(0, 0, (int)ActualWidth, (int)ActualHeight);
-            Debug.WriteLine($"Viewport set to {ActualWidth}x{ActualHeight}");
+            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            GL.BindFramebuffer(FramebufferTarget.Framebuffer, _framebuffer);
-            _renderer.OnRenderFrame(new FrameEventArgs());
+            _pickingShader.Use();
+            _pickingShader.SetMatrix4("view", _camera.GetViewMatrix());
+            _pickingShader.SetMatrix4("projection", _camera.GetProjectionMatrix());
+
+            foreach (var envCell in _currentDungeon.GetAllEnvCells())
+            {
+                var model = Matrix4.CreateScale(envCell.Scale) *
+                            Matrix4.CreateFromQuaternion(envCell.Rotation) *
+                            Matrix4.CreateTranslation(envCell.Position);
+
+                _pickingShader.SetMatrix4("model", model);
+                _pickingShader.SetUInt("objectId", envCell.Id);
+
+                var (vao, _, _) = _envCellMeshes[envCell.EnvironmentId];
+                GL.BindVertexArray(vao);
+                GL.DrawElements(PrimitiveType.Triangles, 36, DrawElementsType.UnsignedInt, 0);
+            }
+
+            uint[] pixelData = new uint[1];
+            GL.ReadPixels((int)mousePosition.X, (int)(ActualHeight - mousePosition.Y), 1, 1, PixelFormat.RedInteger, PixelType.UnsignedInt, pixelData);
+
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
 
-            GL.BindTexture(TextureTarget.Texture2D, _texture);
-            byte[] pixels = new byte[(int)ActualWidth * (int)ActualHeight * 4];
-            GL.GetTexImage(TextureTarget.Texture2D, 0, PixelFormat.Bgra, PixelType.UnsignedByte, pixels);
-
-            _writeableBitmap.Lock();
-            Marshal.Copy(pixels, 0, _writeableBitmap.BackBuffer, pixels.Length);
-            _writeableBitmap.AddDirtyRect(new Int32Rect(0, 0, _writeableBitmap.PixelWidth, _writeableBitmap.PixelHeight));
-            _writeableBitmap.Unlock();
-
-            _image.InvalidateVisual();
-
-            Debug.WriteLine($"Copied {pixels.Length} bytes to WriteableBitmap");
+            _selectedObjectId = pixelData[0];
+            return _currentDungeon.GetEnvCellById(_selectedObjectId);
         }
     }
 }

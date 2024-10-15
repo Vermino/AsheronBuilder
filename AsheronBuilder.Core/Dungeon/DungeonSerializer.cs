@@ -1,139 +1,160 @@
+// AsheronBuilder.Core/Dungeon/DungeonSerializer.cs
+
+using System;
 using System.IO;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Collections.Generic;
-using System.Numerics;
+using OpenTK.Mathematics;
 
 namespace AsheronBuilder.Core.Dungeon
 {
     public static class DungeonSerializer
     {
-        private static JsonSerializerOptions _options = new JsonSerializerOptions
+        public static void SaveDungeon(DungeonLayout dungeonLayout, string filePath)
         {
-            WriteIndented = true,
-            Converters = { new JsonStringEnumConverter() }
-        };
+            try
+            {
+                var dungeonData = new DungeonData
+                {
+                    Hierarchy = SerializeHierarchy(dungeonLayout.Hierarchy)
+                };
 
-        public static void SaveDungeon(DungeonLayout dungeon, string filePath)
-        {
-            var dungeonData = new SerializableDungeonData(dungeon);
-            string jsonString = JsonSerializer.Serialize(dungeonData, _options);
-            File.WriteAllText(filePath, jsonString);
+                string jsonString = JsonSerializer.Serialize(dungeonData, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(filePath, jsonString);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error saving dungeon: {ex.Message}", ex);
+            }
         }
 
         public static DungeonLayout LoadDungeon(string filePath)
         {
-            string jsonString = File.ReadAllText(filePath);
-            var dungeonData = JsonSerializer.Deserialize<SerializableDungeonData>(jsonString, _options);
-            return dungeonData.ToDungeonLayout();
-        }
-
-        private class SerializableDungeonData
-        {
-            public List<SerializableEnvCell> EnvCells { get; set; }
-            public SerializableDungeonArea RootArea { get; set; }
-
-            public SerializableDungeonData() { }
-
-            public SerializableDungeonData(DungeonLayout dungeonLayout)
+            try
             {
-                EnvCells = new List<SerializableEnvCell>();
-                foreach (var envCell in dungeonLayout.GetAllEnvCells())
+                string jsonString = File.ReadAllText(filePath);
+                var dungeonData = JsonSerializer.Deserialize<DungeonData>(jsonString);
+
+                if (dungeonData == null)
                 {
-                    EnvCells.Add(new SerializableEnvCell(envCell));
+                    throw new Exception("Failed to deserialize dungeon data");
                 }
 
-                RootArea = new SerializableDungeonArea(dungeonLayout.Hierarchy.RootArea);
-            }
-
-            public DungeonLayout ToDungeonLayout()
-            {
                 var dungeonLayout = new DungeonLayout();
-
-                foreach (var serializableEnvCell in EnvCells)
-                {
-                    var envCell = serializableEnvCell.ToEnvCell();
-                    dungeonLayout.AddEnvCell(envCell, "Root"); // Default to root, we'll update the hierarchy later
-                }
-
-                UpdateHierarchy(dungeonLayout, RootArea, "Root");
-
+                dungeonLayout.SetHierarchy(DeserializeHierarchy(dungeonData.Hierarchy));
                 return dungeonLayout;
             }
-
-            private void UpdateHierarchy(DungeonLayout dungeonLayout, SerializableDungeonArea serializableArea, string path)
+            catch (Exception ex)
             {
-                foreach (var envCellId in serializableArea.EnvCellIds)
-                {
-                    var envCell = dungeonLayout.GetEnvCellById(envCellId);
-                    if (envCell != null)
-                    {
-                        dungeonLayout.Hierarchy.AddEnvCell(envCell, path);
-                    }
-                }
-
-                foreach (var childArea in serializableArea.ChildAreas)
-                {
-                    string childPath = path + "/" + childArea.Name;
-                    UpdateHierarchy(dungeonLayout, childArea, childPath);
-                }
+                throw new Exception($"Error loading dungeon: {ex.Message}", ex);
             }
         }
 
-        private class SerializableEnvCell
+        private static DungeonArea DeserializeArea(AreaData areaData)
         {
-            public uint Id { get; set; }
-            public uint EnvironmentId { get; set; }
-            public float[] Position { get; set; }
-            public float[] Rotation { get; set; }
-            public float[] Scale { get; set; }
+            var area = new DungeonArea(areaData.Name);
+            area.SetPosition(areaData.Position);
+            area.SetRotation(areaData.Rotation);
+            area.SetScale(areaData.Scale);
 
-            public SerializableEnvCell() { }
-
-            public SerializableEnvCell(EnvCell envCell)
+            foreach (var childAreaData in areaData.ChildAreas)
             {
-                Id = envCell.Id;
-                EnvironmentId = envCell.EnvironmentId;
-                Position = new float[] { envCell.Position.X, envCell.Position.Y, envCell.Position.Z };
-                Rotation = new float[] { envCell.Rotation.X, envCell.Rotation.Y, envCell.Rotation.Z, envCell.Rotation.W };
-                Scale = new float[] { envCell.Scale.X, envCell.Scale.Y, envCell.Scale.Z };
+                area.AddChildArea(DeserializeArea(childAreaData));
             }
 
-            public EnvCell ToEnvCell()
+            foreach (var envCellData in areaData.EnvCells)
             {
-                var envCell = new EnvCell(EnvironmentId)
+                area.AddEnvCell(new EnvCell(envCellData.EnvironmentId)
                 {
-                    Id = Id,
-                    Position = new Vector3(Position[0], Position[1], Position[2]),
-                    Rotation = new Quaternion(Rotation[0], Rotation[1], Rotation[2], Rotation[3]),
-                    Scale = new Vector3(Scale[0], Scale[1], Scale[2])
-                };
-                return envCell;
+                    Id = envCellData.Id,
+                    Position = envCellData.Position,
+                    Rotation = envCellData.Rotation,
+                    Scale = envCellData.Scale
+                });
             }
+
+            return area;
         }
 
-        private class SerializableDungeonArea
+        private static HierarchyData SerializeHierarchy(DungeonHierarchy hierarchy)
         {
-            public string Name { get; set; }
-            public List<SerializableDungeonArea> ChildAreas { get; set; }
-            public List<uint> EnvCellIds { get; set; }
-
-            public SerializableDungeonArea() { }
-
-            public SerializableDungeonArea(DungeonArea area)
+            return new HierarchyData
             {
-                Name = area.Name;
-                ChildAreas = new List<SerializableDungeonArea>();
-                foreach (var childArea in area.ChildAreas)
-                {
-                    ChildAreas.Add(new SerializableDungeonArea(childArea));
-                }
-                EnvCellIds = new List<uint>();
-                foreach (var envCell in area.EnvCells)
-                {
-                    EnvCellIds.Add(envCell.Id);
-                }
-            }
+                RootArea = SerializeArea(hierarchy.RootArea)
+            };
         }
+        
+        private static DungeonHierarchy DeserializeHierarchy(HierarchyData hierarchyData)
+        {
+            return new DungeonHierarchy
+            {
+                RootArea = DeserializeArea(hierarchyData.RootArea)
+            };
+        }
+
+        private static AreaData SerializeArea(DungeonArea area)
+        {
+            var areaData = new AreaData
+            {
+                Name = area.Name,
+                Position = area.Position,
+                Rotation = area.Rotation,
+                Scale = area.Scale,
+                ChildAreas = new List<AreaData>(),
+                EnvCells = new List<EnvCellData>()
+            };
+
+            foreach (var childArea in area.ChildAreas)
+            {
+                areaData.ChildAreas.Add(SerializeArea(childArea));
+            }
+
+            foreach (var envCell in area.EnvCells)
+            {
+                areaData.EnvCells.Add(new EnvCellData
+                {
+                    Id = envCell.Id,
+                    EnvironmentId = envCell.EnvironmentId,
+                    Position = envCell.Position,
+                    Rotation = envCell.Rotation,
+                    Scale = envCell.Scale
+                });
+            }
+
+            return areaData;
+        }
+    }
+
+    [Serializable]
+    public class DungeonData
+    {
+        public HierarchyData Hierarchy { get; set; }
+    }
+
+    [Serializable]
+    public class HierarchyData
+    {
+        public AreaData RootArea { get; set; }
+    }
+
+    [Serializable]
+    public class AreaData
+    {
+        public string Name { get; set; }
+        public Vector3 Position { get; set; }
+        public Quaternion Rotation { get; set; }
+        public Vector3 Scale { get; set; }
+        public List<AreaData> ChildAreas { get; set; }
+        public List<EnvCellData> EnvCells { get; set; }
+    }
+
+    [Serializable]
+    public class EnvCellData
+    {
+        public uint Id { get; set; }
+        public uint EnvironmentId { get; set; }
+        public Vector3 Position { get; set; }
+        public Quaternion Rotation { get; set; }
+        public Vector3 Scale { get; set; }
     }
 }

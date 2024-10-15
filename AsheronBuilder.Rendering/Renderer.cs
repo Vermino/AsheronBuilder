@@ -1,4 +1,3 @@
-// AsheronBuilder.Rendering/Renderer.cs
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
@@ -13,7 +12,7 @@ using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace AsheronBuilder.Rendering
 {
-    public class Renderer
+    public class Renderer : IDisposable
     {
         private GameWindow _gameWindow;
         private Shader _shader;
@@ -32,15 +31,47 @@ namespace AsheronBuilder.Rendering
         private bool[] _keyStates;
         private Vector2 _lastMousePosition;
         private bool _isFocused = false;
-
+        private bool disposed = false;
+        private int _programID;
+        
         public Renderer(GameWindow gameWindow)
         {
             _gameWindow = gameWindow;
             _camera = new Camera(new Vector3(0, 5, 10), _gameWindow.Size.X / (float)_gameWindow.Size.Y);
-            _keyStates = new bool[Enum.GetValues(typeof(Keys)).Length];
         }
 
-        public void Run()
+        public void HandleMouseDown(MouseButtonEventArgs e)
+        {
+            if (e.Button == MouseButton.Right)
+            {
+                _camera.IsRightMouseDown = true;
+                _gameWindow.CursorState = CursorState.Grabbed;
+            }
+        }
+
+        public void HandleMouseUp(MouseButtonEventArgs e)
+        {
+            if (e.Button == MouseButton.Right)
+            {
+                _camera.IsRightMouseDown = false;
+                _gameWindow.CursorState = CursorState.Normal;
+            }
+        }
+
+        public void HandleMouseLeave()
+        {
+            _camera.IsRightMouseDown = false;
+            _gameWindow.CursorState = CursorState.Normal;
+        }
+
+
+        public void HandleResize(ResizeEventArgs e)
+        {
+            GL.Viewport(0, 0, e.Width, e.Height);
+            _camera.AspectRatio = e.Width / (float)e.Height;
+        }
+
+        public void Initialize()
         {
             try
             {
@@ -60,7 +91,7 @@ namespace AsheronBuilder.Rendering
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Error in Renderer.Run: {ex.Message}");
+                Debug.WriteLine($"Error in Renderer.Initialize: {ex.Message}");
                 Debug.WriteLine($"Stack trace: {ex.StackTrace}");
             }
         }
@@ -123,7 +154,7 @@ namespace AsheronBuilder.Rendering
             SetupGrid();
         }
 
-        public void LoadEnvironment(EnvironmentLoader.EnvironmentData environmentData)
+        public void LoadEnvironmentData(EnvironmentLoader.EnvironmentData environmentData)
         {
             _environmentData = environmentData;
             Debug.WriteLine($"Loading environment with {_environmentData.Vertices.Count} vertices and {_environmentData.Indices.Count} indices");
@@ -142,7 +173,7 @@ namespace AsheronBuilder.Rendering
             for (int i = 0; i < _environmentData.Vertices.Count; i++)
             {
                 var v = _environmentData.Vertices[i];
-                _environmentData.Vertices[i] = new System.Numerics.Vector3(
+                _environmentData.Vertices[i] = new Vector3(
                     (v.X - center.X) * scale,
                     (v.Y - center.Y) * scale,
                     (v.Z - center.Z) * scale
@@ -190,15 +221,28 @@ namespace AsheronBuilder.Rendering
             GL.EnableVertexAttribArray(0);
         }
 
-        public void OnUpdateFrame(FrameEventArgs e)
+        public void HandleMouseMove(MouseMoveEventArgs e)
         {
             if (_isFocused)
             {
-                _camera.HandleKeyboardInput(_keyStates, (float)e.Time);
+                float deltaX = e.X - _lastMousePosition.X;
+                float deltaY = e.Y - _lastMousePosition.Y;
+                _camera.HandleMouseInput(deltaX, deltaY);
             }
+            _lastMousePosition = new Vector2(e.X, e.Y);
         }
 
-        public void OnRenderFrame(FrameEventArgs e)
+        public void HandleKeyDown(KeyboardKeyEventArgs e)
+        {
+            _keyStates[(int)e.Key] = true;
+        }
+
+        public void HandleKeyUp(KeyboardKeyEventArgs e)
+        {
+            _keyStates[(int)e.Key] = false;
+        }
+
+        public void RenderFrame(FrameEventArgs e)
         {
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
@@ -222,126 +266,17 @@ namespace AsheronBuilder.Rendering
             }
 
             GL.Flush();
-            _gameWindow.SwapBuffers();
-        }
-
-        public void OnResize(ResizeEventArgs e)
-        {
-            GL.Viewport(0, 0, e.Width, e.Height);
-            _camera.AspectRatio = e.Width / (float)e.Height;
         }
         
-        public void OnMouseMove(MouseMoveEventArgs e)
-        {
-            if (_isFocused)
-            {
-                float deltaX = e.X - _lastMousePosition.X;
-                float deltaY = e.Y - _lastMousePosition.Y;
-                _camera.HandleMouseInput(deltaX, deltaY);
-            }
-            _lastMousePosition = new Vector2(e.X, e.Y);
-        }
 
-        public void OnMouseDown(MouseButtonEventArgs e)
+        public void Dispose()
         {
-            if (e.Button == MouseButton.Right)
+            if (!disposed)
             {
-                _camera.SetRightMouseDown(true);
-                _isFocused = true;
-                _gameWindow.CursorGrabbed = true;
-                _gameWindow.CursorVisible = false;
+                // Free up the shader resources, e.g., deleting shaders, program, etc.
+                GL.DeleteProgram(_programID);
+                disposed = true;
             }
         }
-
-        public void OnMouseUp(MouseButtonEventArgs e)
-        {
-            if (e.Button == MouseButton.Right)
-            {
-                _camera.SetRightMouseDown(false);
-                _isFocused = false;
-                _gameWindow.CursorGrabbed = false;
-                _gameWindow.CursorVisible = true;
-            }
-        }
-
-        public void OnMouseLeave()
-        {
-            _camera.SetRightMouseDown(false);
-            _isFocused = false;
-            _gameWindow.CursorGrabbed = false;
-            _gameWindow.CursorVisible = true;
-        }
-
-        public void OnKeyDown(KeyboardKeyEventArgs e)
-        {
-            _keyStates[(int)e.Key] = true;
-        }
-
-        public void OnKeyUp(KeyboardKeyEventArgs e)
-        {
-            _keyStates[(int)e.Key] = false;
-        }
-
-        public void SetDungeonLayout(DungeonLayout dungeonLayout)
-        {
-            _dungeonLayout = dungeonLayout;
-            UpdateEnvironmentData();
-        }
-
-        private void UpdateEnvironmentData()
-        {
-            _environmentData = new EnvironmentLoader.EnvironmentData();
-            foreach (var area in _dungeonLayout.Hierarchy.RootArea.GetAllAreas())
-            {
-                foreach (var envCell in area.EnvCells)
-                {
-                    // AddEnvCellToEnvironmentData(envCell);
-                }
-            }
-            SetupEnvironmentBuffers();
-        }
-
-        // TODO My head kind-of hurts trying to figure this one out. I believe we need the geometry from the client or Datreader
-        // private void AddEnvCellToEnvironmentData(EnvCell envCell)
-        // {
-        //     Vector3[] cubeVertices = {
-        //         new Vector3(-0.5f, -0.5f, -0.5f),
-        //         new Vector3(0.5f, -0.5f, -0.5f),
-        //         new Vector3(0.5f, 0.5f, -0.5f),
-        //         new Vector3(-0.5f, 0.5f, -0.5f),
-        //         new Vector3(-0.5f, -0.5f, 0.5f),
-        //         new Vector3(0.5f, -0.5f, 0.5f),
-        //         new Vector3(0.5f, 0.5f, 0.5f),
-        //         new Vector3(-0.5f, 0.5f, 0.5f)
-        //     };
-        //
-        //     int[] cubeIndices = {
-        //         0, 1, 1, 2, 2, 3, 3, 0,
-        //         4, 5, 5, 6, 6, 7, 7, 4,
-        //         0, 4, 1, 5, 2, 6, 3, 7
-        //     };
-        //
-        //     int baseIndex = _environmentData.Vertices.Count;
-        //
-        //     Matrix4 scaleMatrix = Matrix4.CreateScale(envCell.Scale.X, envCell.Scale.Y, envCell.Scale.Z);
-        //     Quaternion rotationQuaternion = new Quaternion(envCell.Rotation.X, envCell.Rotation.Y, envCell.Rotation.Z, envCell.Rotation.W);
-        //     Matrix4 rotationMatrix = Matrix4.CreateFromQuaternion(rotationQuaternion);
-        //     Matrix4 translationMatrix = Matrix4.CreateTranslation(envCell.Position.X, envCell.Position.Y, envCell.Position.Z);
-        //
-        //     // Combine matrices to form the final transformation matrix
-        //     Matrix4 transform = scaleMatrix * rotationMatrix * translationMatrix;
-        //
-        //     // Add transformed vertices to the environment data
-        //     foreach (var vertex in cubeVertices)
-        //     { 
-        //         Vector3 transformedVertex = Vector3.Transform(vertex, transform);
-        //         _environmentData.Vertices.Add(new System.Numerics.Vector3(transformedVertex.X, transformedVertex.Y, transformedVertex.Z));
-        //     }
-        //     
-        //     foreach (var index in cubeIndices)
-        //     {
-        //         _environmentData.Indices.Add(baseIndex + index);
-        //     }
-        // }
     }
 }
