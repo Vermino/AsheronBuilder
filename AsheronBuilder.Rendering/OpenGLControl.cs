@@ -1,13 +1,13 @@
-// File: AsheronBuilder.Rendering/OpenGLControl.cs
+// AsheronBuilder.Rendering/OpenGLControl.cs
 
-using System;
-using System.Collections.Generic;
-using System.Windows;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Wpf;
 using AsheronBuilder.Core.Dungeon;
 using AsheronBuilder.Core.Landblock;
+using System;
+using System.Collections.Generic;
+using System.Windows;
 
 namespace AsheronBuilder.Rendering
 {
@@ -28,15 +28,25 @@ namespace AsheronBuilder.Rendering
         private int _pickingTexture;
         private uint _selectedObjectId = 0;
 
-        public OpenGLControl() : base(new GLWpfControlSettings
+        public OpenGLControl() : base()
         {
-            MajorVersion = 3,
-            MinorVersion = 3
-        })
-        {
-            _camera = new Camera(new Vector3(0, 5, 10), Vector3.UnitY);
+            GLWpfControlSettings settings = new GLWpfControlSettings
+            {
+                MajorVersion = 3,
+                MinorVersion = 3,
+                GraphicsProfile = OpenTK.Windowing.Common.ContextProfile.Core
+            };
+            Start(settings);
+
+            _camera = new Camera(new Vector3(0, 5, 10), 1.0f); // set the aspect ratio later
             _envCellMeshes = new Dictionary<uint, (int, int, int)>();
             Render += OnRender;
+            SizeChanged += OpenGLControl_SizeChanged;
+        }
+        
+        private void OpenGLControl_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            _camera.AspectRatio = (float)(ActualWidth / ActualHeight);
         }
         
         public void SetLandblock(Landblock landblock)
@@ -180,20 +190,36 @@ namespace AsheronBuilder.Rendering
 
         private void RenderGrid()
         {
+            _shader.Use();
             _shader.SetMatrix4("model", Matrix4.Identity);
 
-            GL.Begin(PrimitiveType.Lines);
-            GL.Color3(0.5f, 0.5f, 0.5f);
+            int vao = GL.GenVertexArray();
+            GL.BindVertexArray(vao);
 
+            int vbo = GL.GenBuffer();
+            GL.BindBuffer(BufferTarget.ArrayBuffer, vbo);
+
+            List<float> gridVertices = new List<float>();
             for (int i = -10; i <= 10; i++)
             {
-                GL.Vertex3(i, 0, -10);
-                GL.Vertex3(i, 0, 10);
-                GL.Vertex3(-10, 0, i);
-                GL.Vertex3(10, 0, i);
+                gridVertices.AddRange(new[] { i, 0f, -10f, 0.5f, 0.5f, 0.5f });
+                gridVertices.AddRange(new[] { i, 0f, 10f, 0.5f, 0.5f, 0.5f });
+                gridVertices.AddRange(new[] { -10f, 0f, i, 0.5f, 0.5f, 0.5f });
+                gridVertices.AddRange(new[] { 10f, 0f, i, 0.5f, 0.5f, 0.5f });
             }
 
-            GL.End();
+            GL.BufferData(BufferTarget.ArrayBuffer, gridVertices.Count * sizeof(float), gridVertices.ToArray(), BufferUsageHint.StaticDraw);
+
+            GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+            GL.EnableVertexAttribArray(0);
+
+            GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+            GL.EnableVertexAttribArray(1);
+
+            GL.DrawArrays(PrimitiveType.Lines, 0, gridVertices.Count / 6);
+
+            GL.DeleteBuffer(vbo);
+            GL.DeleteVertexArray(vao);
         }
 
         public void SetDungeonLayout(DungeonLayout dungeonLayout)
@@ -216,27 +242,7 @@ namespace AsheronBuilder.Rendering
         {
             _showCollision = visible;
         }
-
-        public void ResetCamera()
-        {
-            _camera.Position = new Vector3(0, 5, 10);
-            _camera.Yaw = -90f;
-            _camera.Pitch = 0f;
-            _camera.UpdateVectors();
-        }
-
-        public void SetTopView()
-        {
-            _camera.Position = new Vector3(0, 20, 0);
-            _camera.Pitch = -90f;
-            _camera.Yaw = -90f;
-            _camera.UpdateVectors();
-        }
-
-        public void MoveCamera(Vector3 movement)
-        {
-            _camera.Position += movement;
-        }
+        
 
         public void RotateCamera(float yaw, float pitch)
         {
@@ -281,135 +287,6 @@ namespace AsheronBuilder.Rendering
 
             _selectedObjectId = pixelData[0];
             return _currentDungeon.GetEnvCellById(_selectedObjectId);
-        }
-    }
-
-    public class Camera
-    {
-        public Vector3 Position { get; set; }
-        public Vector3 Front { get; private set; }
-        public Vector3 Up { get; private set; }
-        public Vector3 Right { get; private set; }
-        public float Yaw { get; set; } = -90f;
-        public float Pitch { get; set; } = 0f;
-
-        private float _aspectRatio = 1.0f;
-
-        public Camera(Vector3 position, Vector3 up)
-        {
-            Position = position;
-            Up = up;
-            UpdateVectors();
-        }
-
-        public void UpdateVectors()
-        {
-            Front.X = (float)Math.Cos(MathHelper.DegreesToRadians(Yaw)) * (float)Math.Cos(MathHelper.DegreesToRadians(Pitch));
-            Front.Y = (float)Math.Sin(MathHelper.DegreesToRadians(Pitch));
-            Front.Z = (float)Math.Sin(MathHelper.DegreesToRadians(Yaw)) * (float)Math.Cos(MathHelper.DegreesToRadians(Pitch));
-            Front = Vector3.Normalize(Front);
-
-            Right = Vector3.Normalize(Vector3.Cross(Front, Vector3.UnitY));
-            Up = Vector3.Normalize(Vector3.Cross(Right, Front));
-        }
-
-        public Matrix4 GetViewMatrix()
-        {
-            return Matrix4.LookAt(Position, Position + Front, Up);
-        }
-
-        public Matrix4 GetProjectionMatrix()
-        {
-            return Matrix4.CreatePerspectiveFieldOfView(
-                MathHelper.DegreesToRadians(45.0f),
-                _aspectRatio,
-                0.1f,
-                100.0f);
-        }
-
-        public void SetAspectRatio(float aspectRatio)
-        {
-            _aspectRatio = aspectRatio;
-        }
-    }
-
-    public class Shader
-    {
-        public int Handle { get; private set; }
-
-        public Shader(string vertexPath, string fragmentPath)
-        {
-            string vertexShaderSource = System.IO.File.ReadAllText(vertexPath);
-            string fragmentShaderSource = System.IO.File.ReadAllText(fragmentPath);
-
-            int vertexShader = GL.CreateShader(ShaderType.VertexShader);
-            GL.ShaderSource(vertexShader, vertexShaderSource);
-            CompileShader(vertexShader);
-
-            int fragmentShader = GL.CreateShader(ShaderType.FragmentShader);
-            GL.ShaderSource(fragmentShader, fragmentShaderSource);
-            CompileShader(fragmentShader);
-
-            Handle = GL.CreateProgram();
-            GL.AttachShader(Handle, vertexShader);
-            GL.AttachShader(Handle, fragmentShader);
-            LinkProgram(Handle);
-
-            GL.DetachShader(Handle, vertexShader);
-            GL.DetachShader(Handle, fragmentShader);
-            GL.DeleteShader(vertexShader);
-            GL.DeleteShader(fragmentShader);
-        }
-
-        private static void CompileShader(int shader)
-        {
-            GL.CompileShader(shader);
-            GL.GetShader(shader, ShaderParameter.CompileStatus, out int success);
-            if (success == 0)
-            {
-                string infoLog = GL.GetShaderInfoLog(shader);
-                throw new Exception($"Error compiling shader: {infoLog}");
-            }
-        }
-
-        private static void LinkProgram(int program)
-        {
-            GL.LinkProgram(program);
-            GL.GetProgram(program, GetProgramParameterName.LinkStatus, out int success);
-            if (success == 0)
-            {
-                string infoLog = GL.GetProgramInfoLog(program);
-                throw new Exception($"Error linking program: {infoLog}");
-            }
-        }
-
-        public void Use()
-        {
-            GL.UseProgram(Handle);
-        }
-
-        public void SetMatrix4(string name, Matrix4 matrix)
-        {
-            int location = GL.GetUniformLocation(Handle, name);
-            GL.UniformMatrix4(location, false, ref matrix);
-        }
-
-        public void SetVector3(string name, Vector3 vector)
-        {
-            int location = GL.GetUniformLocation(Handle, name);
-            GL.Uniform3(location, vector);
-        }
-
-        public void SetFloat(string name, float value)
-        {
-            int location = GL.GetUniformLocation(Handle, name);
-            GL.Uniform1(location, value);
-        }
-
-        public void SetUInt(string name, uint value)
-        {
-            int location = GL.GetUniformLocation(Handle, name);
-            GL.Uniform1(location, value);
         }
     }
 }

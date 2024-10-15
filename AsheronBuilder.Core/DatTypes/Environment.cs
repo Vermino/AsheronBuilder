@@ -1,11 +1,12 @@
-﻿// File: AsheronBuilder.Core/DatTypes/Environment.cs
+﻿// AsheronBuilder.Core/DatTypes/Environment.cs
 
 using System.Collections.Generic;
-using OpenTK.Mathematics;
+using System.Numerics;
+using ACClientLib.DatReaderWriter.IO;
 
 namespace AsheronBuilder.Core.DatTypes
 {
-    public class Environment
+    public class Environment : IDatFileType
     {
         public uint Id { get; set; }
         public List<CellStruct> Cells { get; set; }
@@ -15,7 +16,23 @@ namespace AsheronBuilder.Core.DatTypes
             Cells = new List<CellStruct>();
         }
 
-        // Add methods for loading and manipulating environment data
+        public bool Unpack(DatFileReader reader)
+        {
+            // Implement unpacking logic
+            return true;
+        }
+
+        public int GetSize()
+        {
+            // Implement size calculation
+            return 0;
+        }
+
+        public bool Pack(DatFileWriter writer)
+        {
+            // Implement packing logic
+            return true;
+        }
     }
 
     public class CellStruct

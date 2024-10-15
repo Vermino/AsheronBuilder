@@ -1,7 +1,11 @@
-// File: AsheronBuilder.Core/Assets/AssetManager.cs
+// AsheronBuilder.Core/Assets/AssetManager.cs
 
 using System.Collections.Concurrent;
 using AsheronBuilder.Core.DatTypes;
+using AsheronBuilder.Core.Constants;
+using Environment = AsheronBuilder.Core.DatTypes.Environment;
+using ACClientLib.DatReaderWriter;
+using ACClientLib.DatReaderWriter.Options;
 
 namespace AsheronBuilder.Core.Assets
 {
@@ -11,10 +15,21 @@ namespace AsheronBuilder.Core.Assets
         private readonly ConcurrentDictionary<uint, Texture> _textures = new();
         private readonly ConcurrentDictionary<uint, GfxObj> _models = new();
         private readonly ConcurrentDictionary<uint, Environment> _environments = new();
+        private DatManager _datManager;
 
         public AssetManager(string datPath)
         {
             _datPath = datPath;
+            InitializeDatManager();
+        }
+
+        private void InitializeDatManager()
+        {
+            _datManager = new DatManager(options =>
+            {
+                options.DatDirectory = _datPath;
+                options.IndexCachingStrategy = IndexCachingStrategy.Upfront;
+            });
         }
 
         public async Task LoadAssetsAsync()
@@ -72,38 +87,44 @@ namespace AsheronBuilder.Core.Assets
 
         public List<uint> GetTextureFileIds()
         {
-            // Implement this method to return a list of texture file IDs
-            return new List<uint>();
+            return new List<uint>(_datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.Texture).Select(f => f.Id));
         }
 
         public List<uint> GetModelFileIds()
         {
-            // Implement this method to return a list of model file IDs
-            return new List<uint>();
+            return new List<uint>(_datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.GraphicsObject).Select(f => f.Id));
         }
 
         public List<uint> GetEnvironmentFileIds()
         {
-            // Implement this method to return a list of environment file IDs
-            return new List<uint>();
+            return new List<uint>(_datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.Environment).Select(f => f.Id));
         }
 
         private Texture LoadTexture(uint fileId)
         {
-            // Implement this method to load a texture from the DAT file
-            return new Texture();
+            if (_datManager.Portal.TryReadFile(fileId, out Texture texture))
+            {
+                return texture;
+            }
+            throw new FileNotFoundException($"Texture with ID {fileId} not found.");
         }
 
         private GfxObj LoadModel(uint fileId)
         {
-            // Implement this method to load a model from the DAT file
-            return new GfxObj();
+            if (_datManager.Portal.TryReadFile(fileId, out GfxObj model))
+            {
+                return model;
+            }
+            throw new FileNotFoundException($"Model with ID {fileId} not found.");
         }
 
         private Environment LoadEnvironment(uint fileId)
         {
-            // Implement this method to load an environment from the DAT file
-            return new Environment();
+            if (_datManager.Portal.TryReadFile(fileId, out Environment environment))
+            {
+                return environment;
+            }
+            throw new FileNotFoundException($"Environment with ID {fileId} not found.");
         }
     }
 }

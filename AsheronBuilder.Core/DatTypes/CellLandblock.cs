@@ -1,15 +1,22 @@
-﻿// AsheronBuilder.Core/DatTypes/Texture.cs
+﻿// AsheronBuilder.Core/DatTypes/CellLandblock.cs
 
+using System.Collections.Generic;
+using System.Numerics;
 using ACClientLib.DatReaderWriter.IO;
 
 namespace AsheronBuilder.Core.DatTypes
 {
-    public class Texture : IDatFileType
+    public class CellLandblock : IDatFileType
     {
         public uint Id { get; set; }
-        public int Width { get; set; }
-        public int Height { get; set; }
-        public byte[] TextureData { get; set; }
+        public List<Vector3> Vertices { get; set; }
+        public List<int> Indices { get; set; }
+
+        public CellLandblock()
+        {
+            Vertices = new List<Vector3>();
+            Indices = new List<int>();
+        }
 
         public bool Unpack(DatFileReader reader)
         {

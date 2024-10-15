@@ -33,14 +33,42 @@ namespace AsheronBuilder.Rendering
         private bool _isFocused = false;
         private bool disposed = false;
         private int _programID;
-
-
         
         public Renderer(GameWindow gameWindow)
         {
             _gameWindow = gameWindow;
             _camera = new Camera(new Vector3(0, 5, 10), _gameWindow.Size.X / (float)_gameWindow.Size.Y);
-            _keyStates = new bool[Enum.GetValues(typeof(Keys)).Length];
+        }
+
+        public void HandleMouseDown(MouseButtonEventArgs e)
+        {
+            if (e.Button == MouseButton.Right)
+            {
+                _camera.IsRightMouseDown = true;
+                _gameWindow.CursorState = CursorState.Grabbed;
+            }
+        }
+
+        public void HandleMouseUp(MouseButtonEventArgs e)
+        {
+            if (e.Button == MouseButton.Right)
+            {
+                _camera.IsRightMouseDown = false;
+                _gameWindow.CursorState = CursorState.Normal;
+            }
+        }
+
+        public void HandleMouseLeave()
+        {
+            _camera.IsRightMouseDown = false;
+            _gameWindow.CursorState = CursorState.Normal;
+        }
+
+
+        public void HandleResize(ResizeEventArgs e)
+        {
+            GL.Viewport(0, 0, e.Width, e.Height);
+            _camera.AspectRatio = e.Width / (float)e.Height;
         }
 
         public void Initialize()
@@ -145,7 +173,7 @@ namespace AsheronBuilder.Rendering
             for (int i = 0; i < _environmentData.Vertices.Count; i++)
             {
                 var v = _environmentData.Vertices[i];
-                _environmentData.Vertices[i] = new System.Numerics.Vector3(
+                _environmentData.Vertices[i] = new Vector3(
                     (v.X - center.X) * scale,
                     (v.Y - center.Y) * scale,
                     (v.Z - center.Z) * scale
@@ -204,36 +232,6 @@ namespace AsheronBuilder.Rendering
             _lastMousePosition = new Vector2(e.X, e.Y);
         }
 
-        public void HandleMouseDown(MouseButtonEventArgs e)
-        {
-            if (e.Button == MouseButton.Right)
-            {
-                _camera.SetRightMouseDown(true);
-                _isFocused = true;
-                _gameWindow.CursorGrabbed = true;
-                _gameWindow.CursorVisible = false;
-            }
-        }
-
-        public void HandleMouseUp(MouseButtonEventArgs e)
-        {
-            if (e.Button == MouseButton.Right)
-            {
-                _camera.SetRightMouseDown(false);
-                _isFocused = false;
-                _gameWindow.CursorGrabbed = false;
-                _gameWindow.CursorVisible = true;
-            }
-        }
-
-        public void HandleMouseLeave()
-        {
-            _camera.SetRightMouseDown(false);
-            _isFocused = false;
-            _gameWindow.CursorGrabbed = false;
-            _gameWindow.CursorVisible = true;
-        }
-
         public void HandleKeyDown(KeyboardKeyEventArgs e)
         {
             _keyStates[(int)e.Key] = true;
@@ -242,12 +240,6 @@ namespace AsheronBuilder.Rendering
         public void HandleKeyUp(KeyboardKeyEventArgs e)
         {
             _keyStates[(int)e.Key] = false;
-        }
-
-        public void HandleResize(ResizeEventArgs e)
-        {
-            GL.Viewport(0, 0, e.Width, e.Height);
-            _camera.AspectRatio = e.Width / (float)e.Height;
         }
 
         public void RenderFrame(FrameEventArgs e)

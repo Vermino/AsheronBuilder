@@ -1,6 +1,8 @@
-// File: AsheronBuilder.UI/MainWindow.xaml.cs
+// AsheronBuilder.UI/MainWindow.xaml.cs
 
 using System;
+using System.IO;
+using System.Numerics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -9,10 +11,16 @@ using AsheronBuilder.Core.Assets;
 using AsheronBuilder.Core.Dungeon;
 using AsheronBuilder.Rendering;
 using AsheronBuilder.Core.Commands;
-using Microsoft.Win32;
+using AsheronBuilder.Core.Utils;
+using AsheronBuilder.UI.Utils;
 using OpenTK.Mathematics;
+using Microsoft.Win32;
 using AsheronBuilder.Core.Landblock;
 using CommandManager = AsheronBuilder.Core.Commands.CommandManager;
+using Quaternion = OpenTK.Mathematics.Quaternion;
+using Vector2 = OpenTK.Mathematics.Vector2;
+using Vector3 = OpenTK.Mathematics.Vector3;
+
 
 namespace AsheronBuilder.UI
 {
@@ -29,12 +37,15 @@ namespace AsheronBuilder.UI
         private bool _showCollision;
         private EnvCell _selectedEnvCell;
         private Point _lastMousePosition;
-
+        private Camera _camera;
+        
+        
         public MainWindow()
         {
             InitializeComponent();
             _commandManager = new CommandManager();
-            
+            _camera = new Camera(new Vector3(0, 5, 10), 1.0f);
+
             try
             {
                 InitializeAssetManager();
@@ -108,12 +119,92 @@ namespace AsheronBuilder.UI
 
         private void InitializeAssetManager()
         {
-            string datPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
-            if (!System.IO.Directory.Exists(datPath))
+            try
             {
-                System.IO.Directory.CreateDirectory(datPath);
+                string datPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
+                if (!Directory.Exists(datPath))
+                {
+                    Directory.CreateDirectory(datPath);
+                }
+                _assetManager = new AssetManager(datPath);
+                Logger.Log($"AssetManager initialized with path: {datPath}");
             }
-            _assetManager = new AssetManager(datPath);
+            catch (Exception ex)
+            {
+                Logger.LogError("Failed to initialize AssetManager", ex);
+                MessageBox.Show($"Failed to initialize AssetManager: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        
+        private async void LoadAssetsAsync()
+        {
+            var loadingDialog = new LoadingDialog();
+            loadingDialog.Show();
+
+            try
+            {
+                await _assetManager.LoadAssetsAsync();
+                UpdateAssetBrowser();
+                Logger.Log("Assets loaded successfully");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError("Error loading assets", ex);
+                MessageBox.Show($"Error loading assets: {ex.Message}", "Asset Loading Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                loadingDialog.Close();
+            }
+        }
+
+        private void SaveDungeon_Click(object sender, RoutedEventArgs e)
+        {
+            var saveFileDialog = new SaveFileDialog
+            {
+                Filter = "Dungeon Files (*.dungeon)|*.dungeon",
+                DefaultExt = "dungeon"
+            };
+
+            if (saveFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    DungeonSerializer.SaveDungeon(_dungeonLayout, saveFileDialog.FileName);
+                    Logger.Log($"Dungeon saved successfully to: {saveFileDialog.FileName}");
+                    MessageBox.Show("Dungeon saved successfully!", "Save Dungeon", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to save dungeon", ex);
+                    MessageBox.Show($"Failed to save dungeon: {ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
+        private void OpenDungeon_Click(object sender, RoutedEventArgs e)
+        {
+            var openFileDialog = new OpenFileDialog
+            {
+                Filter = "Dungeon Files (*.dungeon)|*.dungeon",
+                DefaultExt = "dungeon"
+            };
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                try
+                {
+                    _dungeonLayout = DungeonSerializer.LoadDungeon(openFileDialog.FileName);
+                    UpdateViewports();
+                    UpdateDungeonHierarchy();
+                    Logger.Log($"Dungeon loaded successfully from: {openFileDialog.FileName}");
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError("Failed to load dungeon", ex);
+                    MessageBox.Show($"Failed to load dungeon: {ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
         }
 
         private void InitializeDungeonLayout()
@@ -127,26 +218,6 @@ namespace AsheronBuilder.UI
             UpdateViewports();
         }
 
-        private async void LoadAssetsAsync()
-        {
-            var loadingDialog = new LoadingDialog();
-            loadingDialog.Show();
-
-            try
-            {
-                await _assetManager.LoadAssetsAsync();
-                UpdateAssetBrowser();
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error loading assets: {ex.Message}", "Asset Loading Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-            finally
-            {
-                loadingDialog.Close();
-            }
-        }
-
         private void SetupEventHandlers()
         {
             MainViewport.MouseMove += MainViewport_MouseMove;
@@ -156,6 +227,121 @@ namespace AsheronBuilder.UI
 
             AssetBrowserTreeView.SelectedItemChanged += AssetBrowserTreeView_SelectedItemChanged;
             DungeonHierarchyTreeView.SelectedItemChanged += DungeonHierarchyTreeView_SelectedItemChanged;
+            
+            ResetViewButton.Click += ResetView_Click;
+            TopViewButton.Click += TopView_Click;
+            SelectObjectCheckBox.Checked += SelectObject_Checked;
+            SelectObjectCheckBox.Unchecked += SelectObject_Unchecked;
+            SelectVertexCheckBox.Checked += SelectVertex_Checked;
+            SelectVertexCheckBox.Unchecked += SelectVertex_Unchecked;
+            SelectFaceCheckBox.Checked += SelectFace_Checked;
+            SelectFaceCheckBox.Unchecked += SelectFace_Unchecked;
+        }
+        
+        private EnvCell PickObject(MouseButtonEventArgs e)
+        {
+            Point mousePosition = e.GetPosition(MainViewport);
+            Vector2 mousePos = mousePosition.ToVector2();
+            return MainViewport.PickObject(mousePos);
+        }
+        
+        private Vector3 CalculateNewPosition(Point currentPos)
+        {
+            Camera.Ray ray = _camera.GetPickingRay(mousePosition.ToVector2(), MainViewport.ActualWidth, MainViewport.ActualHeight);
+            Plane groundPlane = new Plane(Vector3.UnitY, 0); // Assuming Y is up
+
+            if (ray.Intersects(groundPlane, out float distance))
+            {
+                return ray.Origin + ray.Direction * distance;
+            }
+
+            return _selectedEnvCell.Position; // Return current position if no intersection
+        }
+
+        private void SetPosition_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement position setting logic
+        }
+
+        private void SetScale_Click(object sender, RoutedEventArgs e)
+        {
+            // Implement scale setting logic
+        }
+        
+        private void ResetView_Click(object sender, RoutedEventArgs e)
+        {
+            // Reset camera to default position and orientation
+            _camera.Position = new Vector3(0, 5, 10);
+            _camera.Yaw = -90f;
+            _camera.Pitch = 0f;
+            _camera.UpdateVectors();
+            MainViewport.InvalidateVisual();
+        }
+        
+        private void TopView_Click(object sender, RoutedEventArgs e)
+        {
+            // Set camera to top-down view
+            _camera.Position = new Vector3(0, 20, 0);
+            _camera.Yaw = -90f;
+            _camera.Pitch = -90f;
+            _camera.UpdateVectors();
+            MainViewport.InvalidateVisual();
+        }
+
+        private void SelectObject_Checked(object sender, RoutedEventArgs e)
+        {
+            _currentMode = ManipulationMode.Select;
+        }
+
+        private void SelectObject_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_currentMode == ManipulationMode.Select)
+            {
+                _currentMode = ManipulationMode.Move;
+            }
+        }
+
+        private void SelectVertex_Checked(object sender, RoutedEventArgs e)
+        {
+            // Implement vertex selection mode
+        }
+
+        private void SelectVertex_Unchecked(object sender, RoutedEventArgs e)
+        {
+            // Disable vertex selection mode
+        }
+
+        private void SelectFace_Checked(object sender, RoutedEventArgs e)
+        {
+            // Implement face selection mode
+        }
+
+        private void SelectFace_Unchecked(object sender, RoutedEventArgs e)
+        {
+            // Disable face selection mode
+        }
+
+        private void MainViewport_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed)
+            {
+                var currentPos = e.GetPosition(MainViewport);
+                if (_currentMode == ManipulationMode.Move && _selectedEnvCell != null)
+                {
+                    Vector3 newPosition = CalculateNewPosition(currentPos);
+                    var command = new MoveEnvCellCommand(_dungeonLayout, _selectedEnvCell, newPosition);
+                    _commandManager.ExecuteCommand(command);
+                    UpdateViewports();
+                }
+                else
+                {
+                    // Camera rotation
+                    _camera.HandleMouseInput((float)(currentPos.X - _lastMousePosition.X), 
+                                             (float)(currentPos.Y - _lastMousePosition.Y));
+                    MainViewport.InvalidateVisual();
+                }
+                _lastMousePosition = currentPos;
+            }
         }
 
         private void UpdateViewports()
@@ -220,28 +406,8 @@ namespace AsheronBuilder.UI
                 areaItem.Items.Add(envCellItem);
             }
         }
-
-        private void MainViewport_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (e.LeftButton == MouseButtonState.Pressed)
-            {
-                var currentPos = e.GetPosition(MainViewport);
-                if (_currentMode == ManipulationMode.Move && _selectedEnvCell != null)
-                {
-                    Vector3 newPosition = CalculateNewPosition(currentPos);
-                    var command = new MoveEnvCellCommand(_dungeonLayout, _selectedEnvCell, newPosition);
-                    _commandManager.ExecuteCommand(command);
-                    UpdateViewports();
-                }
-                else
-                {
-                    // Camera rotation
-                    MainViewport.RotateCamera((float)(currentPos.X - _lastMousePosition.X) * 0.1f,
-                                              (float)(currentPos.Y - _lastMousePosition.Y) * 0.1f);
-                }
-                _lastMousePosition = currentPos;
-            }
-        }
+        
+        
 
         private void MainViewport_MouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -255,6 +421,7 @@ namespace AsheronBuilder.UI
                 }
             }
         }
+        
 
         private void MainViewport_MouseUp(object sender, MouseButtonEventArgs e)
         {
@@ -333,36 +500,6 @@ namespace AsheronBuilder.UI
             _dungeonLayout = new DungeonLayout();
             UpdateViewports();
             UpdateDungeonHierarchy();
-        }
-
-        private void OpenDungeon_Click(object sender, RoutedEventArgs e)
-        {
-            var openFileDialog = new OpenFileDialog
-            {
-                Filter = "Dungeon Files (*.dungeon)|*.dungeon",
-                DefaultExt = "dungeon"
-            };
-
-            if (openFileDialog.ShowDialog() == true)
-            {
-                _dungeonLayout = DungeonSerializer.LoadDungeon(openFileDialog.FileName);
-                UpdateViewports();
-                UpdateDungeonHierarchy();
-            }
-        }
-
-        private void SaveDungeon_Click(object sender, RoutedEventArgs e)
-        {
-            var saveFileDialog = new SaveFileDialog
-            {
-                Filter = "Dungeon Files (*.dungeon)|*.dungeon",
-                DefaultExt = "dungeon"
-            };
-
-            if (saveFileDialog.ShowDialog() == true)
-            {
-                DungeonSerializer.SaveDungeon(_dungeonLayout, saveFileDialog.FileName);
-            }
         }
 
         private void Exit_Click(object sender, RoutedEventArgs e)
@@ -467,12 +604,13 @@ namespace AsheronBuilder.UI
             // Implement this method to find the path of the EnvCell in the dungeon hierarchy
             return "Root";
         }
-
-        private Vector3 CalculateNewPosition(Point currentPos)
+    }
+    
+    public static class PointExtensions
+    {
+        public static Vector2 ToVector2(this Point point)
         {
-            // Implement this method to calculate the new position based on mouse movement and camera orientation
-            // This is a placeholder implementation
-            return new Vector3((float)currentPos.X, (float)currentPos.Y, 0);
+            return new Vector2((float)point.X, (float)point.Y);
         }
     }
 

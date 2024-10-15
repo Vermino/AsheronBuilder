@@ -1,89 +1,119 @@
 // AsheronBuilder.Rendering/Camera.cs
+
 using OpenTK.Mathematics;
 using System;
-using OpenTK.Windowing.GraphicsLibraryFramework;
 
 namespace AsheronBuilder.Rendering
 {
     public class Camera
     {
-        public Vector3 Position;
-        public Vector3 Front;
-        public Vector3 Up;
-        public Vector3 Right;
+        public Vector3 Position { get; set; }
+        public Vector3 Front { get; private set; }
+        public Vector3 Up { get; private set; }
+        public Vector3 Right { get; private set; }
+        public float Yaw { get; set; } = -90f;
+        public float Pitch { get; set; } = 0f;
+        private float _aspectRatio = 1.0f;
+        public bool IsRightMouseDown { get; set; }
         public float AspectRatio { get; set; }
-        public float Yaw { get; set; } = -MathHelper.PiOver2;
-        public float Pitch { get; set; }
-        private float _movementSpeed = 0.1f;
-        private float _mouseSensitivity = 0.1f;
-        private bool _isRightMouseDown = false;
 
         public Camera(Vector3 position, float aspectRatio)
         {
             Position = position;
             AspectRatio = aspectRatio;
-            Front = -Vector3.UnitZ;
             Up = Vector3.UnitY;
             UpdateVectors();
         }
 
-        public Matrix4 GetViewMatrix() => Matrix4.LookAt(Position, Position + Front, Up);
-
-        public Matrix4 GetProjectionMatrix() => Matrix4.CreatePerspectiveFieldOfView(MathHelper.PiOver2, AspectRatio, 0.1f, 1000f);
-
         public void UpdateVectors()
         {
-            Front.X = (float)(Math.Cos(MathHelper.DegreesToRadians(Yaw)) * Math.Cos(MathHelper.DegreesToRadians(Pitch)));
-            Front.Y = (float)Math.Sin(MathHelper.DegreesToRadians(Pitch));
-            Front.Z = (float)(Math.Sin(MathHelper.DegreesToRadians(Yaw)) * Math.Cos(MathHelper.DegreesToRadians(Pitch)));
-            Front = Vector3.Normalize(Front);
+            Front = new Vector3(
+                (float)Math.Cos(MathHelper.DegreesToRadians(Yaw)) * (float)Math.Cos(MathHelper.DegreesToRadians(Pitch)),
+                (float)Math.Sin(MathHelper.DegreesToRadians(Pitch)),
+                (float)Math.Sin(MathHelper.DegreesToRadians(Yaw)) * (float)Math.Cos(MathHelper.DegreesToRadians(Pitch))
+            ).Normalized();
 
             Right = Vector3.Normalize(Vector3.Cross(Front, Vector3.UnitY));
             Up = Vector3.Normalize(Vector3.Cross(Right, Front));
         }
 
-        public void Move(Vector3 direction, float deltaTime)
+        public Matrix4 GetViewMatrix()
         {
-            Position += direction * _movementSpeed * deltaTime;
+            return Matrix4.LookAt(Position, Position + Front, Up);
         }
 
-        public void Rotate(float deltaX, float deltaY)
+        public Matrix4 GetProjectionMatrix()
         {
-            Yaw += deltaX * _mouseSensitivity;
-            Pitch -= deltaY * _mouseSensitivity; // Inverted Y-axis for right-click
-            Pitch = Math.Clamp(Pitch, -89f, 89f);
-            UpdateVectors();
+            return Matrix4.CreatePerspectiveFieldOfView(
+                MathHelper.DegreesToRadians(45.0f),
+                _aspectRatio,
+                0.1f,
+                100.0f);
         }
-
-        public void HandleKeyboardInput(bool[] keyStates, float deltaTime)
+        
+        public void SetAspectRatio(float aspectRatio)
         {
-            Vector3 moveDirection = Vector3.Zero;
-
-            if (keyStates[(int)Keys.W]) moveDirection += Front;
-            if (keyStates[(int)Keys.S]) moveDirection -= Front;
-            if (keyStates[(int)Keys.A]) moveDirection -= Right;
-            if (keyStates[(int)Keys.D]) moveDirection += Right;
-            if (keyStates[(int)Keys.Space]) moveDirection += Vector3.UnitY;
-            if (keyStates[(int)Keys.LeftShift]) moveDirection -= Vector3.UnitY;
-
-            if (moveDirection != Vector3.Zero)
-            {
-                moveDirection.Normalize();
-                Move(moveDirection, deltaTime);
-            }
+            _aspectRatio = aspectRatio;
         }
 
         public void HandleMouseInput(float deltaX, float deltaY)
         {
-            if (_isRightMouseDown)
+            Yaw += deltaX * 0.1f;
+            Pitch -= deltaY * 0.1f;
+            Pitch = MathHelper.Clamp(Pitch, -89f, 89f);
+            UpdateVectors();
+        }
+        
+        public struct Ray
+        {
+            public Vector3 Origin;
+            public Vector3 Direction;
+
+            public Ray(Vector3 origin, Vector3 direction)
             {
-                Rotate(deltaX, deltaY);
+                Origin = origin;
+                Direction = direction.Normalized();
+            }
+
+            public bool Intersects(Plane plane, out float distance)
+            {
+                float denom = Vector3.Dot(plane.Normal, Direction);
+                if (Math.Abs(denom) > float.Epsilon)
+                {
+                    Vector3 p0l0 = plane.Normal * plane.D - Origin;
+                    distance = Vector3.Dot(p0l0, plane.Normal) / denom;
+                    return distance >= 0;
+                }
+
+                distance = 0;
+                return false;
             }
         }
 
-        public void SetRightMouseDown(bool isDown)
+        public Ray GetPickingRay(Vector2 mousePosition, float viewportWidth, float viewportHeight)
         {
-            _isRightMouseDown = isDown;
+            Vector4 viewport = new Vector4(0, 0, viewportWidth, viewportHeight);
+            Vector3 nearPoint = UnProject(new Vector3(mousePosition.X, viewportHeight - mousePosition.Y, 0), viewport);
+            Vector3 farPoint = UnProject(new Vector3(mousePosition.X, viewportHeight - mousePosition.Y, 1), viewport);
+
+            Vector3 direction = Vector3.Normalize(farPoint - nearPoint);
+            return new Ray(nearPoint, direction);
+        }
+
+        private Vector3 UnProject(Vector3 source, Vector4 viewport)
+        {
+            Vector4 vec = new Vector4(
+                (source.X - viewport.X) / viewport.Z * 2.0f - 1.0f,
+                (source.Y - viewport.Y) / viewport.W * 2.0f - 1.0f,
+                2.0f * source.Z - 1.0f,
+                1.0f
+            );
+
+            Matrix4 viewProjectionInverse = (GetProjectionMatrix() * GetViewMatrix()).Inverted();
+            vec = viewProjectionInverse * vec;
+            vec /= vec.W;
+
+            return new Vector3(vec.X, vec.Y, vec.Z);
         }
     }
 }

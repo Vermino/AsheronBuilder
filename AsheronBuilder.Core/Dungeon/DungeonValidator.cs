@@ -1,7 +1,9 @@
+// AsheronBuilder.Core/Dungeon/DungeonValidator.cs
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
+using OpenTK.Mathematics;
 
 namespace AsheronBuilder.Core.Dungeon
 {
@@ -11,22 +13,11 @@ namespace AsheronBuilder.Core.Dungeon
         {
             var errors = new List<string>();
 
-            // Check for overlapping EnvCells
             errors.AddRange(CheckOverlappingEnvCells(dungeonLayout));
-
-            // Check for disconnected EnvCells
             errors.AddRange(CheckDisconnectedEnvCells(dungeonLayout));
-
-            // Check for invalid scales
             errors.AddRange(CheckInvalidScales(dungeonLayout));
-
-            // Check for EnvCells outside the valid range
             errors.AddRange(CheckEnvCellsOutOfBounds(dungeonLayout));
-
-            // Check for duplicate EnvCell IDs
             errors.AddRange(CheckDuplicateEnvCellIds(dungeonLayout));
-
-            // Check for invalid hierarchy
             errors.AddRange(CheckInvalidHierarchy(dungeonLayout));
 
             return errors;
@@ -49,8 +40,6 @@ namespace AsheronBuilder.Core.Dungeon
 
         private static bool EnvCellsOverlap(EnvCell cell1, EnvCell cell2)
         {
-            // Implement a more sophisticated collision detection algorithm here
-            // This is a simple bounding box check and may not be sufficient for complex EnvCell shapes
             Vector3 min1 = cell1.Position - cell1.Scale / 2;
             Vector3 max1 = cell1.Position + cell1.Scale / 2;
             Vector3 min2 = cell2.Position - cell2.Scale / 2;
@@ -93,9 +82,7 @@ namespace AsheronBuilder.Core.Dungeon
 
         private static IEnumerable<EnvCell> GetNeighbors(EnvCell cell, List<EnvCell> allCells)
         {
-            // Implement a method to find neighboring EnvCells
-            // This is a simple distance-based check and may need to be refined based on your specific requirements
-            float neighborThreshold = 1.0f; // Adjust this value as needed
+            float neighborThreshold = 1.0f;
             return allCells.Where(c => c.Id != cell.Id && Vector3.Distance(c.Position, cell.Position) <= neighborThreshold);
         }
 
@@ -112,7 +99,6 @@ namespace AsheronBuilder.Core.Dungeon
 
         private static IEnumerable<string> CheckEnvCellsOutOfBounds(DungeonLayout dungeonLayout)
         {
-            // Define the valid range for EnvCell positions
             Vector3 minBounds = new Vector3(-1000, -1000, -1000);
             Vector3 maxBounds = new Vector3(1000, 1000, 1000);
 

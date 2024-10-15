@@ -39,7 +39,7 @@
 
         <!-- Main 3D Viewport -->
         <Border Grid.Row="1" BorderBrush="Black" BorderThickness="1" Margin="5">
-            <rendering:OpenGLControl x:Name="MainViewport" Background="Black"/>
+            <rendering:OpenGLControl x:Name="MainViewport"/>
         </Border>
 
         <!-- Right Panel -->
@@ -60,17 +60,17 @@
                     <RadioButton Content="Rotate" Tag="Rotate" Checked="ManipulationTool_Checked" Foreground="White" Grid.Column="1" Grid.Row="0"/>
                     <RadioButton Content="Scale" Tag="Scale" Checked="ManipulationTool_Checked" Foreground="White" Grid.Column="0" Grid.Row="1"/>
                     <CheckBox Content="Snap to Grid" Checked="SnapToGrid_Checked" Unchecked="SnapToGrid_Unchecked" Foreground="White" Grid.Column="1" Grid.Row="1"/>
-                    <Button Content="Reset View" Click="ResetView_Click" Grid.Column="0" Grid.Row="2" Margin="2"/>
-                    <Button Content="Top View" Click="TopView_Click" Grid.Column="1" Grid.Row="2" Margin="2"/>
+                    <Button x:Name="ResetViewButton" Content="Reset View" Click="ResetView_Click" Grid.Column="0" Grid.Row="2" Margin="2"/>
+                    <Button x:Name="TopViewButton" Content="Top View" Click="TopView_Click" Grid.Column="1" Grid.Row="2" Margin="2"/>
                 </Grid>
             </GroupBox>
 
             <!-- Selection Section -->
             <GroupBox Header="Selection" Foreground="White" BorderBrush="White">
                 <StackPanel>
-                    <CheckBox Content="Select Object" Checked="SelectObject_Checked" Unchecked="SelectObject_Unchecked" Foreground="White"/>
-                    <CheckBox Content="Select Vertex" Checked="SelectVertex_Checked" Unchecked="SelectVertex_Unchecked" Foreground="White"/>
-                    <CheckBox Content="Select Face" Checked="SelectFace_Checked" Unchecked="SelectFace_Unchecked" Foreground="White"/>
+                    <CheckBox x:Name="SelectObjectCheckBox" Content="Select Object" Checked="SelectObject_Checked" Unchecked="SelectObject_Unchecked" Foreground="White"/>
+                    <CheckBox x:Name="SelectVertexCheckBox" Content="Select Vertex" Checked="SelectVertex_Checked" Unchecked="SelectVertex_Unchecked" Foreground="White"/>
+                    <CheckBox x:Name="SelectFaceCheckBox" Content="Select Face" Checked="SelectFace_Checked" Unchecked="SelectFace_Unchecked" Foreground="White"/>
                 </StackPanel>
             </GroupBox>
 
@@ -118,7 +118,7 @@
 
             <!-- Mini-map -->
             <Border Grid.Column="0" BorderBrush="Black" BorderThickness="1" Margin="5">
-                <rendering:OpenGLControl x:Name="MiniMap" Background="#808080"/>
+                <rendering:OpenGLControl x:Name="MiniMap"/>
             </Border>
 
             <!-- Central bottom panel -->
@@ -147,7 +147,7 @@
                 <Button Content="Save" Margin="0,2" Background="LightGray" Click="SaveLandblock_Click"/>
                 <Button Content="Clear" Margin="0,2" Background="LightGray" Click="ClearLandblock_Click"/>
                 <Separator Margin="0,5"/>
-                <TextBlock Text="Landblock ID:" Foreground="White"/>
+                <TextBlock x:Name="LandblockInfoTextBlock" Text="0x0: (landblock) 0 (0x0000, 0x0000, 0x0000)" Foreground="White" Margin="0,0,0,10"/>
                 <TextBox x:Name="LandblockIdTextBox" Margin="0,2"/>
                 <Button Content="Go To Landblock" Click="GoToLandblock_Click" Margin="0,2" Background="LightGray"/>
                 <Separator Margin="0,5"/>

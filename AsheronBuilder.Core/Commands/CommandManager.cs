@@ -6,11 +6,6 @@ using OpenTK.Mathematics;
 
 namespace AsheronBuilder.Core.Commands
 {
-    public interface ICommand
-    {
-        void Execute();
-        void Undo();
-    }
 
     public class CommandManager
     {

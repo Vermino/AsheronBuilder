@@ -8,10 +8,15 @@ namespace AsheronBuilder.Core.Dungeon
 {
     public class DungeonLayout
     {
-        public DungeonHierarchy Hierarchy { get; private set; }
+        public DungeonHierarchy Hierarchy { get; set; }
         private Dictionary<uint, EnvCell> _envCells;
         private uint _nextEnvCellId;
 
+        public void SetHierarchy(DungeonHierarchy hierarchy)
+        {
+            Hierarchy = hierarchy;
+        }
+        
         public DungeonLayout()
         {
             Hierarchy = new DungeonHierarchy();
@@ -56,11 +61,17 @@ namespace AsheronBuilder.Core.Dungeon
 
     public class DungeonHierarchy
     {
-        public DungeonArea RootArea { get; private set; }
+        public List<DungeonArea> Items { get; } = new List<DungeonArea>();
+        public DungeonArea RootArea { get; set; }
 
         public DungeonHierarchy()
         {
             RootArea = new DungeonArea("Root");
+        }
+        
+        public void SetRootArea(DungeonArea rootArea)
+        {
+            RootArea = rootArea;
         }
 
         public void AddEnvCell(EnvCell envCell, string areaPath)
@@ -97,14 +108,48 @@ namespace AsheronBuilder.Core.Dungeon
     public class DungeonArea
     {
         public string Name { get; set; }
+        public Vector3 Position { get; set; }
+        public Vector3 Scale { get; set; }
+        public Quaternion Rotation { get; set; }
         public List<DungeonArea> ChildAreas { get; private set; }
         public List<EnvCell> EnvCells { get; private set; }
+        public DungeonArea? ParentArea { get; set; }
+        
+        public IEnumerable<DungeonArea> GetAllAreas()
+        {
+            yield return this;
+            foreach (var childArea in ChildAreas)
+            {
+                foreach (var area in childArea.GetAllAreas())
+                {
+                    yield return area;
+                }
+            }
+        }
 
         public DungeonArea(string name)
         {
             Name = name;
+            Position = Vector3.Zero;
+            Rotation = Quaternion.Identity;
+            Scale = Vector3.One;
             ChildAreas = new List<DungeonArea>();
             EnvCells = new List<EnvCell>();
+        }
+        
+        public void SetPosition(Vector3 position)
+        {
+            Position = position;
+        }
+
+        public void SetRotation(Quaternion rotation)
+        {
+            Rotation = rotation;
+        }
+
+        public void SetScale(Vector3 scale)
+        {
+            Scale = scale;
         }
 
         public void AddChildArea(DungeonArea area)

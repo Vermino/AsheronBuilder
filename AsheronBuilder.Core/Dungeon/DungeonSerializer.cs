@@ -1,141 +1,160 @@
-// File: AsheronBuilder.Core/DungeonSerializer.cs
+// AsheronBuilder.Core/Dungeon/DungeonSerializer.cs
 
+using System;
 using System.IO;
-using AsheronBuilder.Core.Dungeon;
+using System.Text.Json;
+using System.Collections.Generic;
 using OpenTK.Mathematics;
 
-namespace AsheronBuilder.Core
+namespace AsheronBuilder.Core.Dungeon
 {
     public static class DungeonSerializer
     {
         public static void SaveDungeon(DungeonLayout dungeonLayout, string filePath)
         {
-            using (var writer = new BinaryWriter(File.Open(filePath, FileMode.Create)))
+            try
             {
-                // Write version
-                writer.Write((byte)1);
-
-                // Write EnvCells
-                var envCells = dungeonLayout.GetAllEnvCells().ToList();
-                writer.Write(envCells.Count);
-                foreach (var envCell in envCells)
+                var dungeonData = new DungeonData
                 {
-                    writer.Write(envCell.Id);
-                    writer.Write(envCell.EnvironmentId);
-                    WriteVector3(writer, envCell.Position);
-                    WriteQuaternion(writer, envCell.Rotation);
-                    WriteVector3(writer, envCell.Scale);
-                }
+                    Hierarchy = SerializeHierarchy(dungeonLayout.Hierarchy)
+                };
 
-                // Write Hierarchy
-                WriteHierarchy(writer, dungeonLayout.Hierarchy.RootArea);
+                string jsonString = JsonSerializer.Serialize(dungeonData, new JsonSerializerOptions { WriteIndented = true });
+                File.WriteAllText(filePath, jsonString);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Error saving dungeon: {ex.Message}", ex);
             }
         }
 
         public static DungeonLayout LoadDungeon(string filePath)
         {
-            var dungeonLayout = new DungeonLayout();
-
-            using (var reader = new BinaryReader(File.Open(filePath, FileMode.Open)))
+            try
             {
-                // Read version
-                byte version = reader.ReadByte();
-                if (version != 1) throw new Exception("Unsupported dungeon file version.");
+                string jsonString = File.ReadAllText(filePath);
+                var dungeonData = JsonSerializer.Deserialize<DungeonData>(jsonString);
 
-                // Read EnvCells
-                int envCellCount = reader.ReadInt32();
-                for (int i = 0; i < envCellCount; i++)
+                if (dungeonData == null)
                 {
-                    uint id = reader.ReadUInt32();
-                    uint environmentId = reader.ReadUInt32();
-                    Vector3 position = ReadVector3(reader);
-                    Quaternion rotation = ReadQuaternion(reader);
-                    Vector3 scale = ReadVector3(reader);
-
-                    var envCell = new EnvCell(environmentId)
-                    {
-                        Id = id,
-                        Position = position,
-                        Rotation = rotation,
-                        Scale = scale
-                    };
-                    dungeonLayout.AddEnvCell(envCell);
+                    throw new Exception("Failed to deserialize dungeon data");
                 }
 
-                // Read Hierarchy
-                ReadHierarchy(reader, dungeonLayout.Hierarchy.RootArea, dungeonLayout);
+                var dungeonLayout = new DungeonLayout();
+                dungeonLayout.SetHierarchy(DeserializeHierarchy(dungeonData.Hierarchy));
+                return dungeonLayout;
             }
-
-            return dungeonLayout;
-        }
-
-        private static void WriteVector3(BinaryWriter writer, Vector3 vector)
-        {
-            writer.Write(vector.X);
-            writer.Write(vector.Y);
-            writer.Write(vector.Z);
-        }
-
-        private static Vector3 ReadVector3(BinaryReader reader)
-        {
-            float x = reader.ReadSingle();
-            float y = reader.ReadSingle();
-            float z = reader.ReadSingle();
-            return new Vector3(x, y, z);
-        }
-
-        private static void WriteQuaternion(BinaryWriter writer, Quaternion quaternion)
-        {
-            writer.Write(quaternion.X);
-            writer.Write(quaternion.Y);
-            writer.Write(quaternion.Z);
-            writer.Write(quaternion.W);
-        }
-
-        private static Quaternion ReadQuaternion(BinaryReader reader)
-        {
-            float x = reader.ReadSingle();
-            float y = reader.ReadSingle();
-            float z = reader.ReadSingle();
-            float w = reader.ReadSingle();
-            return new Quaternion(x, y, z, w);
-        }
-
-        private static void WriteHierarchy(BinaryWriter writer, DungeonArea area)
-        {
-            writer.Write(area.Name);
-            writer.Write(area.EnvCells.Count);
-            foreach (var envCell in area.EnvCells)
+            catch (Exception ex)
             {
-                writer.Write(envCell.Id);
+                throw new Exception($"Error loading dungeon: {ex.Message}", ex);
             }
-            writer.Write(area.ChildAreas.Count);
+        }
+
+        private static DungeonArea DeserializeArea(AreaData areaData)
+        {
+            var area = new DungeonArea(areaData.Name);
+            area.SetPosition(areaData.Position);
+            area.SetRotation(areaData.Rotation);
+            area.SetScale(areaData.Scale);
+
+            foreach (var childAreaData in areaData.ChildAreas)
+            {
+                area.AddChildArea(DeserializeArea(childAreaData));
+            }
+
+            foreach (var envCellData in areaData.EnvCells)
+            {
+                area.AddEnvCell(new EnvCell(envCellData.EnvironmentId)
+                {
+                    Id = envCellData.Id,
+                    Position = envCellData.Position,
+                    Rotation = envCellData.Rotation,
+                    Scale = envCellData.Scale
+                });
+            }
+
+            return area;
+        }
+
+        private static HierarchyData SerializeHierarchy(DungeonHierarchy hierarchy)
+        {
+            return new HierarchyData
+            {
+                RootArea = SerializeArea(hierarchy.RootArea)
+            };
+        }
+        
+        private static DungeonHierarchy DeserializeHierarchy(HierarchyData hierarchyData)
+        {
+            return new DungeonHierarchy
+            {
+                RootArea = DeserializeArea(hierarchyData.RootArea)
+            };
+        }
+
+        private static AreaData SerializeArea(DungeonArea area)
+        {
+            var areaData = new AreaData
+            {
+                Name = area.Name,
+                Position = area.Position,
+                Rotation = area.Rotation,
+                Scale = area.Scale,
+                ChildAreas = new List<AreaData>(),
+                EnvCells = new List<EnvCellData>()
+            };
+
             foreach (var childArea in area.ChildAreas)
             {
-                WriteHierarchy(writer, childArea);
+                areaData.ChildAreas.Add(SerializeArea(childArea));
             }
-        }
 
-        private static void ReadHierarchy(BinaryReader reader, DungeonArea area, DungeonLayout dungeonLayout)
-        {
-            area.Name = reader.ReadString();
-            int envCellCount = reader.ReadInt32();
-            for (int i = 0; i < envCellCount; i++)
+            foreach (var envCell in area.EnvCells)
             {
-                uint envCellId = reader.ReadUInt32();
-                var envCell = dungeonLayout.GetEnvCellById(envCellId);
-                if (envCell != null)
+                areaData.EnvCells.Add(new EnvCellData
                 {
-                    area.AddEnvCell(envCell);
-                }
+                    Id = envCell.Id,
+                    EnvironmentId = envCell.EnvironmentId,
+                    Position = envCell.Position,
+                    Rotation = envCell.Rotation,
+                    Scale = envCell.Scale
+                });
             }
-            int childAreaCount = reader.ReadInt32();
-            for (int i = 0; i < childAreaCount; i++)
-            {
-                var childArea = new DungeonArea("");
-                ReadHierarchy(reader, childArea, dungeonLayout);
-                area.AddChildArea(childArea);
-            }
+
+            return areaData;
         }
+    }
+
+    [Serializable]
+    public class DungeonData
+    {
+        public HierarchyData Hierarchy { get; set; }
+    }
+
+    [Serializable]
+    public class HierarchyData
+    {
+        public AreaData RootArea { get; set; }
+    }
+
+    [Serializable]
+    public class AreaData
+    {
+        public string Name { get; set; }
+        public Vector3 Position { get; set; }
+        public Quaternion Rotation { get; set; }
+        public Vector3 Scale { get; set; }
+        public List<AreaData> ChildAreas { get; set; }
+        public List<EnvCellData> EnvCells { get; set; }
+    }
+
+    [Serializable]
+    public class EnvCellData
+    {
+        public uint Id { get; set; }
+        public uint EnvironmentId { get; set; }
+        public Vector3 Position { get; set; }
+        public Quaternion Rotation { get; set; }
+        public Vector3 Scale { get; set; }
     }
 }

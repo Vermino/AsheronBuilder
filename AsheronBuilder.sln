@@ -10,6 +10,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsheronBuilder.Rendering", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsheronBuilder.UI", "AsheronBuilder.UI\AsheronBuilder.UI.csproj", "{E9A7E4B0-9C1A-4E3C-9B7E-9C5E6F6D6A1B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AsheronBuilder.Tests", "AsheronBuilder.Tests\AsheronBuilder.Tests.csproj", "{2B89BB59-1E5A-4925-A9FD-93A6A6BBAA62}"
+EndProject
 Global
 				GlobalSection(SolutionConfigurationPlatforms) = preSolution
 								Debug|Any CPU = Debug|Any CPU
@@ -32,5 +34,9 @@ Global
 								{E9A7E4B0-9C1A-4E3C-9B7E-9C5E6F6D6A1B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 								{E9A7E4B0-9C1A-4E3C-9B7E-9C5E6F6D6A1B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 								{E9A7E4B0-9C1A-4E3C-9B7E-9C5E6F6D6A1B}.Release|Any CPU.Build.0 = Release|Any CPU
+					{2B89BB59-1E5A-4925-A9FD-93A6A6BBAA62}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+					{2B89BB59-1E5A-4925-A9FD-93A6A6BBAA62}.Debug|Any CPU.Build.0 = Debug|Any CPU
+					{2B89BB59-1E5A-4925-A9FD-93A6A6BBAA62}.Release|Any CPU.ActiveCfg = Release|Any CPU
+					{2B89BB59-1E5A-4925-A9FD-93A6A6BBAA62}.Release|Any CPU.Build.0 = Release|Any CPU
 				EndGlobalSection
 EndGlobal

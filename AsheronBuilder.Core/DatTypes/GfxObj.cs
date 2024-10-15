@@ -1,9 +1,13 @@
-﻿using OpenTK.Mathematics;
+﻿// AsheronBuilder.Core/DatTypes/GfxObj.cs
+
+using System;
 using System.Collections.Generic;
+using System.Numerics;
+using ACClientLib.DatReaderWriter.IO;
 
 namespace AsheronBuilder.Core.DatTypes
 {
-    public class GfxObj
+    public class GfxObj : IDatFileType
     {
         public uint Id { get; set; }
         public List<Vector3> Vertices { get; set; }
@@ -19,6 +23,22 @@ namespace AsheronBuilder.Core.DatTypes
             Indices = new List<int>();
         }
 
-        // Add methods for loading and manipulating model data
+        public bool Unpack(DatFileReader reader)
+        {
+            // Implement unpacking logic
+            return true;
+        }
+
+        public int GetSize()
+        {
+            // Implement size calculation
+            return 0;
+        }
+
+        public bool Pack(DatFileWriter writer)
+        {
+            // Implement packing logic
+            return true;
+        }
     }
 }

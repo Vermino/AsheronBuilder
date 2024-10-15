@@ -1,4 +1,5 @@
 // AsheronBuilder.UI/ViewModels/MainViewModel.cs
+
 using AsheronBuilder.Core.Assets;
 using AsheronBuilder.Core.Dungeon;
 using System.IO;
@@ -17,6 +18,7 @@ namespace AsheronBuilder.UI.ViewModels
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
+
         public AssetBrowserViewModel AssetBrowser { get; }
         public DungeonLayoutViewModel DungeonLayout { get; }
 
@@ -65,17 +67,21 @@ namespace AsheronBuilder.UI.ViewModels
         
         public void MoveArea(DungeonArea area, Vector3 newPosition)
         {
+            Vector3 delta = newPosition - area.Position;
             area.Position = newPosition;
+    
             // Update all EnvCells within the area
             foreach (var envCell in area.EnvCells)
             {
-                envCell.Position += newPosition - area.Position;
+                envCell.Position += delta;
             }
+    
             // Recursively update child areas
             foreach (var childArea in area.ChildAreas)
             {
-                MoveArea(childArea, newPosition);
+                MoveArea(childArea, childArea.Position + delta);
             }
+    
             OnPropertyChanged(nameof(DungeonLayout));
         }
 
