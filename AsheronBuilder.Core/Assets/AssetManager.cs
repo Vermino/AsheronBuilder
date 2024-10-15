@@ -1,9 +1,9 @@
-// AsheronBuilder.Core/Assets/AssetManager.cs
 using ACClientLib.DatReaderWriter;
 using ACClientLib.DatReaderWriter.Options;
 using AsheronBuilder.Core.DatTypes;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Environment = AsheronBuilder.Core.DatTypes.Environment;
 
@@ -18,12 +18,6 @@ namespace AsheronBuilder.Core.Assets
 
         public AssetManager(string datPath)
         {
-            if (File.Exists(datPath))
-            {
-                // If datPath is a file, use its directory
-                datPath = Path.GetDirectoryName(datPath);
-            }
-
             if (!Directory.Exists(datPath))
             {
                 throw new DirectoryNotFoundException($"The directory '{datPath}' does not exist.");
@@ -34,8 +28,14 @@ namespace AsheronBuilder.Core.Assets
                 options.DatDirectory = datPath;
                 options.IndexCachingStrategy = IndexCachingStrategy.Upfront;
             });
+
+            // Check if the directory is empty
+            if (Directory.GetFiles(datPath).Length == 0)
+            {
+                Console.WriteLine($"Warning: The directory '{datPath}' is empty. No assets will be loaded.");
+            }
         }
-        // TODO Need help connecting the DAT manager to Trevis DatReaderWriter Library
+
         public List<uint> GetTextureFileIds()
         {
             return _datManager.Portal.Tree.AsEnumerable().Where(f => f.Id >> 24 == 0x05).Select(f => f.Id).ToList();

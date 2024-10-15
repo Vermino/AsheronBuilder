@@ -9,6 +9,7 @@
 
     <ItemGroup>
         <PackageReference Include="OpenTK" Version="4.7.5" />
+        <PackageReference Include="OpenTK.GLWpfControl" Version="4.0.0" />
         <PackageReference Include="System.Drawing.Common" Version="6.0.0" />
         <None Include="Shaders\**" CopyToOutputDirectory="PreserveNewest" />
         <ProjectReference Include="..\AsheronBuilder.Core\AsheronBuilder.Core.csproj" />
