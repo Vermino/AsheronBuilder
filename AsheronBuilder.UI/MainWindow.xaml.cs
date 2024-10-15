@@ -2,6 +2,7 @@
 
 using System;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -44,6 +45,8 @@ namespace AsheronBuilder.UI
             InitializeComponent();
             _commandManager = new CommandManager();
             _camera = new Camera(new Vector3(0, 5, 10), 1.0f);
+
+            InitializeAsync();
 
             try
             {
@@ -115,23 +118,43 @@ namespace AsheronBuilder.UI
                 MessageBox.Show("Invalid landblock ID. Please enter a valid hexadecimal number.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
-
-        private void InitializeAssetManager()
+        
+        private async void InitializeAsync()
         {
             try
             {
-                string datPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
-                if (!Directory.Exists(datPath))
-                {
-                    Directory.CreateDirectory(datPath);
-                }
-                _assetManager = new AssetManager(datPath);
-                Logger.Log($"AssetManager initialized with path: {datPath}");
+                await InitializeAssetManager();
+                InitializeDungeonLayout();
+            
+                _currentMode = ManipulationMode.Move;
+                _snapToGrid = false;
+                _showWireframe = false;
+                _showCollision = false;
+
+                SetupEventHandlers();
             }
             catch (Exception ex)
             {
-                Logger.LogError("Failed to initialize AssetManager", ex);
-                MessageBox.Show($"Failed to initialize AssetManager: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"An error occurred during initialization: {ex.Message}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async Task InitializeAssetManager()
+        {
+            try
+            {
+                string assetsFolderPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets");
+                Console.WriteLine($"Full assets folder path: {Path.GetFullPath(assetsFolderPath)}");
+                _assetManager = new AssetManager(assetsFolderPath);
+                await _assetManager.LoadAssetsAsync();
+                UpdateAssetBrowser();
+                Console.WriteLine("Assets loaded successfully");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error initializing or loading assets: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                throw;
             }
         }
         
@@ -355,21 +378,21 @@ namespace AsheronBuilder.UI
             AssetBrowserTreeView.Items.Clear();
 
             var texturesNode = new TreeViewItem { Header = "Textures" };
-            foreach (var textureId in _assetManager.GetTextureFileIds())
+            foreach (var textureId in _assetManager.GetAllTextureFileIds())
             {
                 texturesNode.Items.Add(new TreeViewItem { Header = $"Texture {textureId}", Tag = textureId });
             }
             AssetBrowserTreeView.Items.Add(texturesNode);
 
             var modelsNode = new TreeViewItem { Header = "Models" };
-            foreach (var modelId in _assetManager.GetModelFileIds())
+            foreach (var modelId in _assetManager.GetAllModelFileIds())
             {
                 modelsNode.Items.Add(new TreeViewItem { Header = $"Model {modelId}", Tag = modelId });
             }
             AssetBrowserTreeView.Items.Add(modelsNode);
 
             var environmentsNode = new TreeViewItem { Header = "Environments" };
-            foreach (var environmentId in _assetManager.GetEnvironmentFileIds())
+            foreach (var environmentId in _assetManager.GetAllEnvironmentFileIds())
             {
                 environmentsNode.Items.Add(new TreeViewItem { Header = $"Environment {environmentId}", Tag = environmentId });
             }

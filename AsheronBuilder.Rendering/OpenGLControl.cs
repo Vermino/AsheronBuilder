@@ -7,7 +7,9 @@ using AsheronBuilder.Core.Dungeon;
 using AsheronBuilder.Core.Landblock;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Windows;
+using System.Windows.Threading;
 
 namespace AsheronBuilder.Rendering
 {
@@ -16,6 +18,7 @@ namespace AsheronBuilder.Rendering
         private LandblockRenderer _landblockRenderer;
         private Landblock _currentLandblock;
         private bool _isInitialized = false;
+        private string _initializationError = null;
         private DungeonLayout _currentDungeon;
         private bool _showGrid = false;
         private bool _wireframeMode = false;
@@ -71,11 +74,30 @@ namespace AsheronBuilder.Rendering
         {
             if (!_isInitialized)
             {
-                InitializeOpenGL();
-                _isInitialized = true;
-                RenderLandblock();
+                try
+                {
+                    InitializeOpenGL();
+                    _isInitialized = true;
+                }
+                catch (Exception ex)
+                {
+                    _initializationError = ex.Message;
+                    Dispatcher.BeginInvoke(DispatcherPriority.Normal, new Action(() =>
+                    {
+                        MessageBox.Show($"Error initializing OpenGL: {_initializationError}", "Initialization Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }));
+                    return;
+                }
             }
 
+            if (_initializationError != null)
+            {
+                // Render an error message or blank screen
+                GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+                return;
+            }
+
+            // Your normal rendering code here
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             _shader.Use();
@@ -102,8 +124,8 @@ namespace AsheronBuilder.Rendering
             GL.ClearColor(0.2f, 0.3f, 0.3f, 1.0f);
             GL.Enable(EnableCap.DepthTest);
 
-            _shader = new Shader("Shaders/shader.vert", "Shaders/shader.frag");
-            _pickingShader = new Shader("Shaders/picking.vert", "Shaders/picking.frag");
+            _shader = new Shader("shader.vert", "shader.frag");
+            _pickingShader = new Shader("picking.vert", "picking.frag");
 
             InitializePickingResources();
         }

@@ -11,51 +11,120 @@ namespace AsheronBuilder.Core.Assets
 {
     public class AssetManager
     {
-        private readonly string _datPath;
+        private readonly List<DatManager> _datManagers = new List<DatManager>();
         private readonly ConcurrentDictionary<uint, Texture> _textures = new();
         private readonly ConcurrentDictionary<uint, GfxObj> _models = new();
         private readonly ConcurrentDictionary<uint, Environment> _environments = new();
-        private DatManager _datManager;
 
-        public AssetManager(string datPath)
+        public AssetManager(string assetsFolderPath)
         {
-            _datPath = datPath;
-            InitializeDatManager();
+            Console.WriteLine($"Initializing AssetManager with path: {assetsFolderPath}");
+
+            if (!Directory.Exists(assetsFolderPath))
+            {
+                Console.WriteLine($"Directory not found: {assetsFolderPath}");
+                throw new DirectoryNotFoundException($"Assets folder not found: {assetsFolderPath}");
+            }
+
+            string[] datFiles = Directory.GetFiles(assetsFolderPath, "*.dat");
+            Console.WriteLine($"Found {datFiles.Length} DAT files in {assetsFolderPath}");
+
+            foreach (var file in datFiles)
+            {
+                Console.WriteLine($"DAT file: {file}");
+            }
+
+            if (datFiles.Length == 0)
+            {
+                Console.WriteLine($"No DAT files found in the Assets folder: {assetsFolderPath}");
+                throw new FileNotFoundException("No DAT files found in the Assets folder.");
+            }
+
+            foreach (string datFile in datFiles)
+            {
+                InitializeDatManager(datFile);
+            }
+
+            Console.WriteLine($"Initialized {_datManagers.Count} DAT managers");
         }
 
-        private void InitializeDatManager()
+        private void InitializeDatManager(string datFilePath)
         {
-            _datManager = new DatManager(options =>
+            var datManager = new DatManager(options =>
             {
-                options.DatDirectory = _datPath;
+                options.DatDirectory = Path.GetDirectoryName(datFilePath);
                 options.IndexCachingStrategy = IndexCachingStrategy.Upfront;
             });
+
+            _datManagers.Add(datManager);
+        }
+
+        public List<uint> GetAllTextureFileIds()
+        {
+            var textureIds = new List<uint>();
+            foreach (var datManager in _datManagers)
+            {
+                textureIds.AddRange(datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.Texture).Select(f => f.Id));
+            }
+            return textureIds;
+        }
+
+        public List<uint> GetAllModelFileIds()
+        {
+            var modelIds = new List<uint>();
+            foreach (var datManager in _datManagers)
+            {
+                modelIds.AddRange(datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.GraphicsObject).Select(f => f.Id));
+            }
+            return modelIds;
+        }
+
+        public List<uint> GetAllEnvironmentFileIds()
+        {
+            var environmentIds = new List<uint>();
+            foreach (var datManager in _datManagers)
+            {
+                environmentIds.AddRange(datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.Environment).Select(f => f.Id));
+            }
+            return environmentIds;
         }
 
         public async Task LoadAssetsAsync()
         {
-            var textureIds = GetTextureFileIds();
-            var modelIds = GetModelFileIds();
-            var environmentIds = GetEnvironmentFileIds();
-
-            var tasks = new List<Task>();
-
-            foreach (var id in textureIds)
+            try
             {
-                tasks.Add(LoadTextureAsync(id));
-            }
+                var textureIds = GetAllTextureFileIds();
+                var modelIds = GetAllModelFileIds();
+                var environmentIds = GetAllEnvironmentFileIds();
 
-            foreach (var id in modelIds)
+                Console.WriteLine(
+                    $"Found {textureIds.Count} textures, {modelIds.Count} models, and {environmentIds.Count} environments");
+
+                var tasks = new List<Task>();
+
+                foreach (var id in textureIds)
+                {
+                    tasks.Add(LoadTextureAsync(id));
+                }
+
+                foreach (var id in modelIds)
+                {
+                    tasks.Add(LoadModelAsync(id));
+                }
+
+                foreach (var id in environmentIds)
+                {
+                    tasks.Add(LoadEnvironmentAsync(id));
+                }
+
+                await Task.WhenAll(tasks);
+            }
+            catch (Exception ex)
             {
-                tasks.Add(LoadModelAsync(id));
+                Console.WriteLine($"Error in LoadAssetsAsync: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                throw;
             }
-
-            foreach (var id in environmentIds)
-            {
-                tasks.Add(LoadEnvironmentAsync(id));
-            }
-
-            await Task.WhenAll(tasks);
         }
 
         private async Task LoadTextureAsync(uint fileId)
@@ -85,45 +154,42 @@ namespace AsheronBuilder.Core.Assets
             });
         }
 
-        public List<uint> GetTextureFileIds()
-        {
-            return new List<uint>(_datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.Texture).Select(f => f.Id));
-        }
-
-        public List<uint> GetModelFileIds()
-        {
-            return new List<uint>(_datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.GraphicsObject).Select(f => f.Id));
-        }
-
-        public List<uint> GetEnvironmentFileIds()
-        {
-            return new List<uint>(_datManager.Portal.Tree.Where(f => f.Id >> 24 == (uint)FileType.Environment).Select(f => f.Id));
-        }
-
         private Texture LoadTexture(uint fileId)
         {
-            if (_datManager.Portal.TryReadFile(fileId, out Texture texture))
+            foreach (var datManager in _datManagers)
             {
-                return texture;
+                if (datManager.Portal.TryReadFile(fileId, out Texture texture))
+                {
+                    return texture;
+                }
             }
+
             throw new FileNotFoundException($"Texture with ID {fileId} not found.");
         }
 
         private GfxObj LoadModel(uint fileId)
         {
-            if (_datManager.Portal.TryReadFile(fileId, out GfxObj model))
+            foreach (var datManager in _datManagers)
             {
-                return model;
+                if (datManager.Portal.TryReadFile(fileId, out GfxObj model))
+                {
+                    return model;
+                }
             }
+
             throw new FileNotFoundException($"Model with ID {fileId} not found.");
         }
 
         private Environment LoadEnvironment(uint fileId)
         {
-            if (_datManager.Portal.TryReadFile(fileId, out Environment environment))
+            foreach (var datManager in _datManagers)
             {
-                return environment;
+                if (datManager.Portal.TryReadFile(fileId, out Environment environment))
+                {
+                    return environment;
+                }
             }
+
             throw new FileNotFoundException($"Environment with ID {fileId} not found.");
         }
     }

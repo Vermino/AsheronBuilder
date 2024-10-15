@@ -16,9 +16,9 @@ namespace AsheronBuilder.UI.ViewModels
         // TODO Need help connecting the DAT manager to Trevis DatReaderWriter Library
         private void LoadAssets()
         {
-            Categories.Add(new AssetCategoryViewModel("Textures", new ObservableCollection<uint>(_assetManager.GetTextureFileIds())));
-            Categories.Add(new AssetCategoryViewModel("Models", new ObservableCollection<uint>(_assetManager.GetModelFileIds())));
-            Categories.Add(new AssetCategoryViewModel("Environments", new ObservableCollection<uint>(_assetManager.GetEnvironmentFileIds())));
+            Categories.Add(new AssetCategoryViewModel("Textures", new ObservableCollection<uint>(_assetManager.GetAllTextureFileIds())));
+            Categories.Add(new AssetCategoryViewModel("Models", new ObservableCollection<uint>(_assetManager.GetAllModelFileIds())));
+            Categories.Add(new AssetCategoryViewModel("Environments", new ObservableCollection<uint>(_assetManager.GetAllEnvironmentFileIds())));
         }
     }
 

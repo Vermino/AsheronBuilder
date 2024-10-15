@@ -18,7 +18,7 @@ namespace AsheronBuilder.UI
 
         private void PopulateEnvironmentList(AssetManager assetManager)
         {
-            var environmentIds = assetManager.GetEnvironmentFileIds();
+            var environmentIds = assetManager.GetAllEnvironmentFileIds();
             EnvironmentListBox.ItemsSource = environmentIds.Select(id => new { Id = id, Name = $"Environment {id}" });
         }
 
