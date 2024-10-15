@@ -1,7 +1,10 @@
-using OpenTK.Graphics.OpenGL4;
-using OpenTK.Mathematics;
+// AsheronBuilder.Rendering/Shader.cs
+
 using System;
 using System.IO;
+using System.Reflection;
+using OpenTK.Graphics.OpenGL4;
+using OpenTK.Mathematics;
 
 namespace AsheronBuilder.Rendering
 {
@@ -11,8 +14,8 @@ namespace AsheronBuilder.Rendering
 
         public Shader(string vertexPath, string fragmentPath)
         {
-            string vertexShaderSource = File.ReadAllText(vertexPath);
-            string fragmentShaderSource = File.ReadAllText(fragmentPath);
+            string vertexShaderSource = LoadShaderSource(vertexPath);
+            string fragmentShaderSource = LoadShaderSource(fragmentPath);
 
             int vertexShader = GL.CreateShader(ShaderType.VertexShader);
             GL.ShaderSource(vertexShader, vertexShaderSource);
@@ -31,6 +34,24 @@ namespace AsheronBuilder.Rendering
             GL.DetachShader(Handle, fragmentShader);
             GL.DeleteShader(vertexShader);
             GL.DeleteShader(fragmentShader);
+        }
+
+        private string LoadShaderSource(string shaderPath)
+        {
+            string resourceName = $"AsheronBuilder.Rendering.Shaders.{Path.GetFileName(shaderPath)}";
+            
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
+            {
+                if (stream == null)
+                {
+                    throw new FileNotFoundException($"Embedded resource not found: {resourceName}");
+                }
+
+                using (StreamReader reader = new StreamReader(stream))
+                {
+                    return reader.ReadToEnd();
+                }
+            }
         }
 
         private static void CompileShader(int shader)

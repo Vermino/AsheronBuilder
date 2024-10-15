@@ -18,6 +18,7 @@ namespace AsheronBuilder.UI.Controls
 {
     public partial class DungeonLayoutEditor : UserControl
     {
+        private TreeView DungeonHierarchy;
         public DungeonLayout DungeonLayout { get; private set; }
         public string CurrentFilePath { get; set; }
 
@@ -36,12 +37,26 @@ namespace AsheronBuilder.UI.Controls
         public DungeonLayoutEditor()
         {
             InitializeComponent();
-            NewDungeon();
+            DungeonHierarchy = new TreeView();
+            this.Content = DungeonHierarchy;
+        }
 
-            // Add keyboard shortcuts for undo/redo
-            this.KeyDown += DungeonLayoutEditor_KeyDown;
-            this.Focusable = true;
-            this.Focus();
+        private void UpdateTreeView()
+        {
+            DungeonHierarchy.Items.Clear();
+            AddAreaToTreeView(DungeonLayout.Hierarchy.RootArea, null);
+        }
+
+        private void AddAreaToTreeView(DungeonArea area, TreeViewItem parentItem)
+        {
+            var item = new TreeViewItem { Header = area.Name, Tag = area };
+            if (parentItem == null)
+                DungeonHierarchy.Items.Add(item);
+            else
+                parentItem.Items.Add(item);
+
+            foreach (var childArea in area.ChildAreas)
+                AddAreaToTreeView(childArea, item);
         }
         
         private void DeleteKeyFromNode(DungeonArea node, uint keyToDelete, int keyIndexInNode)
@@ -55,6 +70,7 @@ namespace AsheronBuilder.UI.Controls
                 node.ParentArea?.ChildAreas.RemoveAt(keyIndexInNode);
             }
         }
+        
         
         private void DungeonLayoutEditor_KeyDown(object sender, KeyEventArgs e)
         {
@@ -257,24 +273,6 @@ namespace AsheronBuilder.UI.Controls
         public void StartDoorPlacement()
         {
             _isPlacingDoor = true;
-        }
-        
-        private void UpdateTreeView()
-        {
-            DungeonHierarchy.Items.Clear();
-            AddAreaToTreeView(DungeonLayout.Hierarchy.RootArea, null);
-        }
-
-        private void AddAreaToTreeView(DungeonArea area, TreeViewItem parentItem)
-        {
-            var item = new TreeViewItem { Header = area.Name };
-            if (parentItem == null)
-                DungeonHierarchy.Items.Add(item);
-            else
-                parentItem.Items.Add(item);
-
-            foreach (var childArea in area.ChildAreas)
-                AddAreaToTreeView(childArea, item);
         }
 
         private string GetAreaPath(DungeonArea area)

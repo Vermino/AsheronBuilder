@@ -2,7 +2,6 @@
 
 using System;
 using System.IO;
-using System.Numerics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -241,21 +240,22 @@ namespace AsheronBuilder.UI
         private EnvCell PickObject(MouseButtonEventArgs e)
         {
             Point mousePosition = e.GetPosition(MainViewport);
-            Vector2 mousePos = mousePosition.ToVector2();
+            Vector2 mousePos = new Vector2((float)mousePosition.X, (float)mousePosition.Y);
             return MainViewport.PickObject(mousePos);
         }
         
         private Vector3 CalculateNewPosition(Point currentPos)
         {
-            Camera.Ray ray = _camera.GetPickingRay(mousePosition.ToVector2(), MainViewport.ActualWidth, MainViewport.ActualHeight);
-            Plane groundPlane = new Plane(Vector3.UnitY, 0); // Assuming Y is up
+            Vector2 mousePos = currentPos.ToVector2();
+            Camera.Ray ray = _camera.GetPickingRay(mousePos, (float)MainViewport.ActualWidth, (float)MainViewport.ActualHeight);
+            Camera.Plane groundPlane = new Camera.Plane(Vector3.UnitY, 0);
 
             if (ray.Intersects(groundPlane, out float distance))
             {
                 return ray.Origin + ray.Direction * distance;
             }
 
-            return _selectedEnvCell.Position; // Return current position if no intersection
+            return _selectedEnvCell.Position;
         }
 
         private void SetPosition_Click(object sender, RoutedEventArgs e)
@@ -416,7 +416,7 @@ namespace AsheronBuilder.UI
                 _lastMousePosition = e.GetPosition(MainViewport);
                 if (_currentMode == ManipulationMode.Select)
                 {
-                    _selectedEnvCell = MainViewport.PickObject(_lastMousePosition);
+                   // _selectedEnvCell = MainViewport.PickObject(_lastMousePosition);
                     UpdatePropertyPanel();
                 }
             }

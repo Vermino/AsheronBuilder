@@ -2,6 +2,9 @@
 
 using OpenTK.Mathematics;
 using System;
+using Vector2 = OpenTK.Mathematics.Vector2;
+using Vector3 = OpenTK.Mathematics.Vector3;
+using Vector4 = OpenTK.Mathematics.Vector4;
 
 namespace AsheronBuilder.Rendering
 {
@@ -11,6 +14,7 @@ namespace AsheronBuilder.Rendering
         public Vector3 Front { get; private set; }
         public Vector3 Up { get; private set; }
         public Vector3 Right { get; private set; }
+        
         public float Yaw { get; set; } = -90f;
         public float Pitch { get; set; } = 0f;
         private float _aspectRatio = 1.0f;
@@ -87,6 +91,18 @@ namespace AsheronBuilder.Rendering
 
                 distance = 0;
                 return false;
+            }
+        }
+        
+        public struct Plane
+        {
+            public Vector3 Normal;
+            public float D;
+
+            public Plane(Vector3 normal, float d)
+            {
+                Normal = normal.Normalized();
+                D = d;
             }
         }
 
