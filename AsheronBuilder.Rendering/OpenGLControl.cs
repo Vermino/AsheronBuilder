@@ -1,4 +1,3 @@
-// AsheronBuilder.Rendering/OpenGLControl.cs
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
@@ -46,18 +45,17 @@ namespace AsheronBuilder.Rendering
             KeyUp += OnKeyUp;
         }
 
-        // TODO Movements keys stopped working in this iteration.
         public void OnMouseMove(object sender, MouseEventArgs e)
         {
             var pos = e.GetPosition(this);
-            _renderer.OnMouseMove(new MouseMoveEventArgs((float)pos.X, (float)pos.Y, 0f, 0f));
+            _renderer.HandleMouseMove(new MouseMoveEventArgs((float)pos.X, (float)pos.Y, 0f, 0f));
         }
 
         public void OnMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (e.RightButton == MouseButtonState.Pressed)
             {
-                _renderer.OnMouseDown(new OpenTK.Windowing.Common.MouseButtonEventArgs(MouseButton.Right, InputAction.Press, 0));
+                _renderer.HandleMouseDown(new OpenTK.Windowing.Common.MouseButtonEventArgs(MouseButton.Right, InputAction.Press, 0));
                 CaptureMouse();
             }
         }
@@ -66,25 +64,25 @@ namespace AsheronBuilder.Rendering
         {
             if (e.RightButton == MouseButtonState.Released)
             {
-                _renderer.OnMouseUp(new OpenTK.Windowing.Common.MouseButtonEventArgs(MouseButton.Right, InputAction.Release, 0));
+                _renderer.HandleMouseUp(new OpenTK.Windowing.Common.MouseButtonEventArgs(MouseButton.Right, InputAction.Release, 0));
                 ReleaseMouseCapture();
             }
         }
 
         public void OnMouseLeave(object sender, MouseEventArgs e)
         {
-            _renderer.OnMouseLeave();
+            _renderer.HandleMouseLeave();
             ReleaseMouseCapture();
         }
 
         public void OnKeyDown(object sender, KeyEventArgs e)
         {
-            _renderer.OnKeyDown(new KeyboardKeyEventArgs(MapKey(e.Key), 0, MapKeyModifiers(Keyboard.Modifiers), e.IsRepeat));
+            _renderer.HandleKeyDown(new KeyboardKeyEventArgs(MapKey(e.Key), 0, MapKeyModifiers(Keyboard.Modifiers), e.IsRepeat));
         }
 
         public void OnKeyUp(object sender, KeyEventArgs e)
         {
-            _renderer.OnKeyUp(new KeyboardKeyEventArgs(MapKey(e.Key), 0, MapKeyModifiers(Keyboard.Modifiers), e.IsRepeat));
+            _renderer.HandleKeyUp(new KeyboardKeyEventArgs(MapKey(e.Key), 0, MapKeyModifiers(Keyboard.Modifiers), e.IsRepeat));
         }
 
         private Keys MapKey(Key key)
@@ -138,12 +136,11 @@ namespace AsheronBuilder.Rendering
             }
 
             _renderer = new Renderer(_gameWindow);
-            _renderer.Run();
+            _renderer.Initialize();
 
             SetupFramebuffer();
 
-            _writeableBitmap =
-                new WriteableBitmap((int)ActualWidth, (int)ActualHeight, 96, 96, PixelFormats.Bgra32, null);
+            _writeableBitmap = new WriteableBitmap((int)ActualWidth, (int)ActualHeight, 96, 96, PixelFormats.Bgra32, null);
             _image.Source = _writeableBitmap;
 
             _renderTimer = new DispatcherTimer();
@@ -173,7 +170,7 @@ namespace AsheronBuilder.Rendering
             if (_gameWindow != null)
             {
                 _gameWindow.Size = new Vector2i((int)ActualWidth, (int)ActualHeight);
-                _renderer?.OnResize(new ResizeEventArgs((int)ActualWidth, (int)ActualHeight));
+                _renderer?.HandleResize(new ResizeEventArgs((int)ActualWidth, (int)ActualHeight));
 
                 _writeableBitmap = new WriteableBitmap((int)ActualWidth, (int)ActualHeight, 96, 96, PixelFormats.Bgra32, null);
                 _image.Source = _writeableBitmap;
@@ -185,14 +182,14 @@ namespace AsheronBuilder.Rendering
         public void Invalidate()
         {
             _gameWindow.MakeCurrent();
-            _renderer.OnRenderFrame(new FrameEventArgs());
+            _renderer.RenderFrame(new FrameEventArgs());
             _gameWindow.SwapBuffers();
         }
 
         public void LoadEnvironment(EnvironmentLoader.EnvironmentData environmentData)
         {
             Debug.WriteLine($"OpenGLControl.LoadEnvironment called with {environmentData.Vertices.Count} vertices and {environmentData.Indices.Count} indices");
-            _renderer.LoadEnvironment(environmentData);
+            _renderer.LoadEnvironmentData(environmentData);
             Debug.WriteLine("Environment data passed to Renderer");
         }
 
@@ -205,7 +202,7 @@ namespace AsheronBuilder.Rendering
             Debug.WriteLine($"Viewport set to {ActualWidth}x{ActualHeight}");
 
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, _framebuffer);
-            _renderer.OnRenderFrame(new FrameEventArgs());
+            _renderer.RenderFrame(new FrameEventArgs());
             GL.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
 
             GL.BindTexture(TextureTarget.Texture2D, _texture);

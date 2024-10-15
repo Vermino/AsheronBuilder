@@ -1,5 +1,6 @@
 // AsheronBuilder.UI/MainWindow.xaml.cs
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Input;
@@ -24,9 +25,9 @@ namespace AsheronBuilder.UI
         public MainWindow()
         {
             InitializeComponent();
-            // InitializeAssetManager();
+            InitializeAssetManager();
             InitializeDungeonLayout();
-            // LoadAssets();
+            LoadAssets();
             
             _currentMode = ManipulationMode.Move;
             _snapToGrid = false;
@@ -34,10 +35,15 @@ namespace AsheronBuilder.UI
         }
 
         // TODO Need help connecting the DAT manager to Trevis DatReaderWriter Library
-        // private void InitializeAssetManager()
-        // {
-        //     _assetManager = new AssetManager(@"C:\Users\Vermino\RiderProjects\AsheronBuilder\Assets\client_cell_1.dat");
-        // }
+        private void InitializeAssetManager()
+        {
+            string datFilePath = @"C:\Users\Vermino\RiderProjects\AsheronBuilder\Assets";
+            if (!Directory.Exists(datFilePath))
+            {
+                throw new DirectoryNotFoundException($"The directory '{datFilePath}' does not exist.");
+            }
+            _assetManager = new AssetManager(datFilePath);
+        }
 
         private void InitializeDungeonLayout()
         {
@@ -46,33 +52,33 @@ namespace AsheronBuilder.UI
         }
         
         // TODO Need help connecting the DAT manager to Trevis DatReaderWriter Library
-        // private void LoadAssets()
-        // {
-        //     var textures = _assetManager.GetTextureFileIds();
-        //     var models = _assetManager.GetModelFileIds();
-        //     var environments = _assetManager.GetEnvironmentFileIds();
-        //
-        //     var texturesNode = new TreeViewItem { Header = "Textures" };
-        //     foreach (var textureId in textures)
-        //     {
-        //         texturesNode.Items.Add(new TreeViewItem { Header = $"Texture {textureId}" });
-        //     }
-        //     AssetTreeView.Items.Add(texturesNode);
-        //
-        //     var modelsNode = new TreeViewItem { Header = "Models" };
-        //     foreach (var modelId in models)
-        //     {
-        //         modelsNode.Items.Add(new TreeViewItem { Header = $"Model {modelId}" });
-        //     }
-        //     AssetTreeView.Items.Add(modelsNode);
-        //
-        //     var environmentsNode = new TreeViewItem { Header = "Environments" };
-        //     foreach (var environmentId in environments)
-        //     {
-        //         environmentsNode.Items.Add(new TreeViewItem { Header = $"Environment {environmentId}" });
-        //     }
-        //     AssetTreeView.Items.Add(environmentsNode);
-        // }
+        private void LoadAssets()
+        {
+            var textures = _assetManager.GetTextureFileIds();
+            var models = _assetManager.GetModelFileIds();
+            var environments = _assetManager.GetEnvironmentFileIds();
+        
+            var texturesNode = new TreeViewItem { Header = "Textures" };
+            foreach (var textureId in textures)
+            {
+                texturesNode.Items.Add(new TreeViewItem { Header = $"Texture {textureId}" });
+            }
+            AssetTreeView.Items.Add(texturesNode);
+        
+            var modelsNode = new TreeViewItem { Header = "Models" };
+            foreach (var modelId in models)
+            {
+                modelsNode.Items.Add(new TreeViewItem { Header = $"Model {modelId}" });
+            }
+            AssetTreeView.Items.Add(modelsNode);
+        
+            var environmentsNode = new TreeViewItem { Header = "Environments" };
+            foreach (var environmentId in environments)
+            {
+                environmentsNode.Items.Add(new TreeViewItem { Header = $"Environment {environmentId}" });
+            }
+            AssetTreeView.Items.Add(environmentsNode);
+        }
 
         private void UpdateHierarchyTreeView()
         {

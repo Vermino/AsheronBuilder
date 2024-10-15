@@ -16,34 +16,40 @@ namespace AsheronBuilder.Core.Assets
         private readonly AssetCache<GfxObj> _modelCache = new AssetCache<GfxObj>();
         private readonly AssetCache<Environment> _environmentCache = new AssetCache<Environment>();
 
-        public AssetManager(string datFilePath)
+        public AssetManager(string datPath)
         {
-            if (!Directory.Exists(datFilePath))
+            if (File.Exists(datPath))
             {
-                throw new DirectoryNotFoundException($"The directory '{datFilePath}' does not exist.");
+                // If datPath is a file, use its directory
+                datPath = Path.GetDirectoryName(datPath);
+            }
+
+            if (!Directory.Exists(datPath))
+            {
+                throw new DirectoryNotFoundException($"The directory '{datPath}' does not exist.");
             }
 
             _datManager = new DatManager(options =>
             {
-                options.DatDirectory = datFilePath;
+                options.DatDirectory = datPath;
                 options.IndexCachingStrategy = IndexCachingStrategy.Upfront;
             });
         }
         // TODO Need help connecting the DAT manager to Trevis DatReaderWriter Library
-        // public List<uint> GetTextureFileIds()
-        // {
-        //     return _datManager.Portal.Tree.GetEnumerator().Where(f => f.Id >> 24 == 0x05).Select(f => f.Id).ToList();
-        // }
-        //
-        // public List<uint> GetModelFileIds()
-        // {
-        //     return _datManager.Portal.Tree.GetEnumerator().Where(f => f.Id >> 24 == 0x01).Select(f => f.Id).ToList();
-        // }
-        //
-        // public List<uint> GetEnvironmentFileIds()
-        // { 
-        //     return _datManager.Portal.Tree.GetEnumerator().Where(f => f.Id >> 24 == 0x0D).Select(f => f.Id).ToList();
-        // } 
+        public List<uint> GetTextureFileIds()
+        {
+            return _datManager.Portal.Tree.AsEnumerable().Where(f => f.Id >> 24 == 0x05).Select(f => f.Id).ToList();
+        }
+        
+        public List<uint> GetModelFileIds()
+        {
+            return _datManager.Portal.Tree.AsEnumerable().Where(f => f.Id >> 24 == 0x01).Select(f => f.Id).ToList();
+        }
+        
+        public List<uint> GetEnvironmentFileIds()
+        { 
+            return _datManager.Portal.Tree.AsEnumerable().Where(f => f.Id >> 24 == 0x0D).Select(f => f.Id).ToList();
+        }
 
         public Texture LoadTexture(uint fileId)
         {

@@ -50,10 +50,10 @@ namespace AsheronBuilder.Core.IO
             throw new Exception($"Failed to load landblock with ID {fileId}");
         }
         // TODO Need help connecting the DAT manager to Trevis DatReaderWriter Library
-        // public List<uint> GetFileIdsOfType(uint typeId)
-        // {
-        //     return _datManager.Portal.Tree.GetEnumerator().Where(f => f.Id >> 24 == typeId).Select(f => f.Id).ToList();
-        // }
+        public List<uint> GetFileIdsOfType(uint typeId)
+        {
+            return _datManager.Portal.Tree.AsEnumerable().Where(f => f.Id >> 24 == typeId).Select(f => f.Id).ToList();
+        }
 
         public void SaveGfxObj(GfxObj model)
         {
@@ -74,11 +74,12 @@ namespace AsheronBuilder.Core.IO
         {
             // Implement saving logic using _datManager.Cell
         }
-        /*
+
+        // TODO Need help connecting the DAT manager to Trevis DatReaderWriter Library
         public bool FileExists(uint fileId)
         {
-            return _datManager.Portal.Tree.GetEnumerator().Any(f => f.Id == fileId);
-        }*/
+            return _datManager.Portal.Tree.AsEnumerable().Any(f => f.Id == fileId);
+        }
 
         public void DeleteFile(uint fileId)
         {

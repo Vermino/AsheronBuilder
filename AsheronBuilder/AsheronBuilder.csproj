@@ -10,6 +10,7 @@
     <ItemGroup>
         <ProjectReference Include="..\AsheronBuilder.Core\AsheronBuilder.Core.csproj" />
         <ProjectReference Include="..\AsheronBuilder.Rendering\AsheronBuilder.Rendering.csproj" />
+        <ProjectReference Include="..\External\DatReaderWriter\DatReaderWriter\DatReaderWriter.csproj" />
     </ItemGroup>
 
 </Project>
