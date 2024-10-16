@@ -9,7 +9,10 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Threading;
+using AsheronBuilder.UI.Utils;
+using MouseButtonEventArgs = System.Windows.Input.MouseButtonEventArgs;
 
 namespace AsheronBuilder.Rendering
 {
@@ -30,6 +33,11 @@ namespace AsheronBuilder.Rendering
         private int _pickingFramebuffer;
         private int _pickingTexture;
         private uint _selectedObjectId = 0;
+        private bool _isRightMouseDown = false;
+        private Point _lastMousePos;
+        private HashSet<Key> _pressedKeys = new HashSet<Key>();
+        
+        public Camera Camera => _camera;
 
         public OpenGLControl() : base()
         {
@@ -45,6 +53,55 @@ namespace AsheronBuilder.Rendering
             _envCellMeshes = new Dictionary<uint, (int, int, int)>();
             Render += OnRender;
             SizeChanged += OpenGLControl_SizeChanged;
+            MouseDown += OpenGLControl_MouseDown;
+            MouseUp += OpenGLControl_MouseUp;
+            MouseMove += OpenGLControl_MouseMove;
+            KeyDown += OpenGLControl_KeyDown;
+            KeyUp += OpenGLControl_KeyUp;
+        }
+        
+        private void OpenGLControl_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.RightButton == MouseButtonState.Pressed)
+            {
+                _isRightMouseDown = true;
+                _lastMousePos = e.GetPosition(this);
+                CaptureMouse();
+                Cursor = Cursors.None;
+            }
+        }
+
+        private void OpenGLControl_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.RightButton == MouseButtonState.Released)
+            {
+                _isRightMouseDown = false;
+                ReleaseMouseCapture();
+                Cursor = Cursors.Arrow;
+            }
+        }
+
+        private void OpenGLControl_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_isRightMouseDown)
+            {
+                var currentPos = e.GetPosition(this);
+                float deltaX = (float)(currentPos.X - _lastMousePos.X);
+                float deltaY = (float)(currentPos.Y - _lastMousePos.Y);
+                _camera.Yaw += deltaX * 0.1f;
+                _camera.Pitch += deltaY * 0.1f; // Inverted looking up and down
+                _lastMousePos = currentPos;
+            }
+        }
+
+        private void OpenGLControl_KeyDown(object sender, KeyEventArgs e)
+        {
+            _pressedKeys.Add(e.Key);
+        }
+
+        private void OpenGLControl_KeyUp(object sender, KeyEventArgs e)
+        {
+            _pressedKeys.Remove(e.Key);
         }
         
         private void OpenGLControl_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -107,6 +164,9 @@ namespace AsheronBuilder.Rendering
 
             _shader.SetMatrix4("view", view);
             _shader.SetMatrix4("projection", projection);
+            
+            RenderGrid(); // Always render the grid
+            UpdateCameraPosition();
 
             if (_currentDungeon != null)
             {
@@ -243,6 +303,11 @@ namespace AsheronBuilder.Rendering
             GL.DeleteBuffer(vbo);
             GL.DeleteVertexArray(vao);
         }
+        
+        public void SetGridVisibility(bool isVisible)
+        {
+            _showGrid = isVisible;
+        }
 
         public void SetDungeonLayout(DungeonLayout dungeonLayout)
         {
@@ -309,6 +374,59 @@ namespace AsheronBuilder.Rendering
 
             _selectedObjectId = pixelData[0];
             return _currentDungeon.GetEnvCellById(_selectedObjectId);
+        }
+
+        private void UpdateCameraPosition()
+        {
+            Vector3 movement = Vector3.Zero;
+
+            if (_pressedKeys.Contains(Key.W)) movement += _camera.Front;
+            if (_pressedKeys.Contains(Key.S)) movement -= _camera.Front;
+            if (_pressedKeys.Contains(Key.A)) movement -= _camera.Right;
+            if (_pressedKeys.Contains(Key.D)) movement += _camera.Right;
+            if (_pressedKeys.Contains(Key.Space)) movement += Vector3.UnitY;
+            if (_pressedKeys.Contains(Key.LeftShift)) movement -= Vector3.UnitY;
+
+            if (movement != Vector3.Zero)
+            {
+                movement.Normalize();
+                _camera.Position += movement * _camera.MovementSpeed;
+            }
+        }
+
+        public void HandleResize(int width, int height)
+        {
+            GL.Viewport(0, 0, width, height);
+            _camera.AspectRatio = width / (float)height;
+        }
+
+        public void Dispose()
+        {
+            foreach (var (vao, vbo, ebo) in _envCellMeshes.Values)
+            {
+                GL.DeleteVertexArray(vao);
+                GL.DeleteBuffer(vbo);
+                GL.DeleteBuffer(ebo);
+            }
+
+            GL.DeleteFramebuffer(_pickingFramebuffer);
+            GL.DeleteTexture(_pickingTexture);
+
+            _shader.Dispose();
+            _pickingShader.Dispose();
+        }
+
+        public void Invalidate()
+        {
+            throw new NotImplementedException();
+        }
+    }
+
+    public static class PointExtensions
+    {
+        public static Vector2 ToVector2(this Point point)
+        {
+            return new Vector2((float)point.X, (float)point.Y);
         }
     }
 }

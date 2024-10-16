@@ -2,7 +2,7 @@
 
 using System.Drawing;
 using OpenTK.Mathematics;
-using System.Windows;
+using System.Windows.Input;
 
 namespace AsheronBuilder.UI.Utils
 {

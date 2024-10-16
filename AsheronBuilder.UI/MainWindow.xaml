@@ -8,7 +8,12 @@
         mc:Ignorable="d"
         Title="AC World Builder v3.3.1" Height="720" Width="1280"
         Background="#800000">
-    <Grid>
+    <Window.Resources>
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+    </Window.Resources>
+    <Grid x:Name="MainGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -18,6 +23,7 @@
             <ColumnDefinition Width="*"/>
             <ColumnDefinition Width="250"/>
         </Grid.ColumnDefinitions>
+        
 
         <!-- Menu -->
         <Menu Grid.ColumnSpan="2" Background="#800000" Foreground="White">
@@ -99,7 +105,13 @@
 
             <!-- Asset Browser -->
             <GroupBox Header="Asset Browser" Foreground="White" BorderBrush="White">
-                <TreeView x:Name="AssetBrowserTreeView" Background="#400000" Foreground="White" BorderBrush="White"/>
+                <TreeView x:Name="AssetBrowserTreeView" Background="#400000">
+                    <TreeView.Resources>
+                        <Style TargetType="{x:Type TreeViewItem}">
+                            <Setter Property="Foreground" Value="White"/>
+                        </Style>
+                    </TreeView.Resources>
+                </TreeView>
             </GroupBox>
 
             <!-- Dungeon Hierarchy -->

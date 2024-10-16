@@ -16,38 +16,63 @@ namespace AsheronBuilder.Core.Assets
         private readonly ConcurrentDictionary<uint, Texture> _textures = new();
         private readonly ConcurrentDictionary<uint, GfxObj> _models = new();
         private readonly ConcurrentDictionary<uint, Environment> _environments = new();
+        private readonly string _assetsFolderPath;
+        private bool _datFilesLoaded = false;
 
         public AssetManager(string assetsFolderPath)
         {
-            Console.WriteLine($"Initializing AssetManager with path: {assetsFolderPath}");
-
-            if (!Directory.Exists(assetsFolderPath))
-            {
-                Console.WriteLine($"Directory not found: {assetsFolderPath}");
-                throw new DirectoryNotFoundException($"Assets folder not found: {assetsFolderPath}");
-            }
-
-            string[] datFiles = Directory.GetFiles(assetsFolderPath, "*.dat");
-            Console.WriteLine($"Found {datFiles.Length} DAT files in {assetsFolderPath}");
-
-            foreach (var file in datFiles)
-            {
-                Console.WriteLine($"DAT file: {file}");
-            }
-
-            if (datFiles.Length == 0)
-            {
-                Console.WriteLine($"No DAT files found in the Assets folder: {assetsFolderPath}");
-                throw new FileNotFoundException("No DAT files found in the Assets folder.");
-            }
-
-            foreach (string datFile in datFiles)
-            {
-                InitializeDatManager(datFile);
-            }
-
-            Console.WriteLine($"Initialized {_datManagers.Count} DAT managers");
+            _assetsFolderPath = assetsFolderPath;
         }
+
+        public bool AreDatFilesPresent()
+        {
+            return Directory.GetFiles(_assetsFolderPath, "*.dat").Length > 0;
+        }
+        
+        public async Task LoadAssetsAsync()
+        {
+            if (!AreDatFilesPresent())
+            {
+                _datFilesLoaded = false;
+                return; // Don't attempt to load if no DAT files are present
+            }
+            
+            try
+            {
+                var textureIds = GetAllTextureFileIds();
+                var modelIds = GetAllModelFileIds();
+                var environmentIds = GetAllEnvironmentFileIds();
+
+                var tasks = new List<Task>();
+
+                foreach (var id in textureIds)
+                {
+                    tasks.Add(LoadTextureAsync(id));
+                }
+
+                foreach (var id in modelIds)
+                {
+                    tasks.Add(LoadModelAsync(id));
+                }
+
+                foreach (var id in environmentIds)
+                {
+                    tasks.Add(LoadEnvironmentAsync(id));
+                }
+
+                _datFilesLoaded = true;
+                await Task.CompletedTask; // Placeholder for actual async operations
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in LoadAssetsAsync: {ex.Message}");
+                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+                throw;
+            }
+            
+        }
+        
+        public bool AreAssetsLoaded() => _datFilesLoaded;
 
         private void InitializeDatManager(string datFilePath)
         {
@@ -100,43 +125,7 @@ namespace AsheronBuilder.Core.Assets
             return fileIds;
         }
 
-        public async Task LoadAssetsAsync()
-        {
-            try
-            {
-                var textureIds = GetAllTextureFileIds();
-                var modelIds = GetAllModelFileIds();
-                var environmentIds = GetAllEnvironmentFileIds();
 
-                Console.WriteLine(
-                    $"Found {textureIds.Count} textures, {modelIds.Count} models, and {environmentIds.Count} environments");
-
-                var tasks = new List<Task>();
-
-                foreach (var id in textureIds)
-                {
-                    tasks.Add(LoadTextureAsync(id));
-                }
-
-                foreach (var id in modelIds)
-                {
-                    tasks.Add(LoadModelAsync(id));
-                }
-
-                foreach (var id in environmentIds)
-                {
-                    tasks.Add(LoadEnvironmentAsync(id));
-                }
-
-                await Task.WhenAll(tasks);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error in LoadAssetsAsync: {ex.Message}");
-                Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-                throw;
-            }
-        }
 
         private async Task LoadTextureAsync(uint fileId)
         {

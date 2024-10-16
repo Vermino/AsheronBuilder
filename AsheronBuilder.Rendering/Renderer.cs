@@ -1,3 +1,5 @@
+// AsheronBuilder.Rendering/Renderer.cs
+
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.Windowing.Common;
@@ -63,7 +65,6 @@ namespace AsheronBuilder.Rendering
             _camera.IsRightMouseDown = false;
             _gameWindow.CursorState = CursorState.Normal;
         }
-
 
         public void HandleResize(ResizeEventArgs e)
         {
@@ -273,7 +274,6 @@ namespace AsheronBuilder.Rendering
         {
             if (!disposed)
             {
-                // Free up the shader resources, e.g., deleting shaders, program, etc.
                 GL.DeleteProgram(_programID);
                 disposed = true;
             }
