@@ -13,7 +13,12 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="OpenTK" Version="4.8.2" />
+        <PackageReference Include="OpenTK" Version="4.8.2" />
+        <PackageReference Include="Ookii.Dialogs.Wpf" Version="4.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <Reference Include="System.Windows.Forms" />
     </ItemGroup>
 
     <ItemGroup>

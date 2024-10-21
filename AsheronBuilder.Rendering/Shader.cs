@@ -8,7 +8,7 @@ using OpenTK.Mathematics;
 
 namespace AsheronBuilder.Rendering
 {
-    public class Shader
+    public class Shader : IDisposable
     {
         public int Handle { get; private set; }
 
@@ -103,6 +103,10 @@ namespace AsheronBuilder.Rendering
         {
             int location = GL.GetUniformLocation(Handle, name);
             GL.Uniform1(location, value);
+        }
+        public void Dispose()
+        {
+            GL.DeleteProgram(Handle);
         }
     }
 }

@@ -2,9 +2,6 @@
 
 using OpenTK.Mathematics;
 using System;
-using Vector2 = OpenTK.Mathematics.Vector2;
-using Vector3 = OpenTK.Mathematics.Vector3;
-using Vector4 = OpenTK.Mathematics.Vector4;
 
 namespace AsheronBuilder.Rendering
 {
@@ -17,9 +14,10 @@ namespace AsheronBuilder.Rendering
         
         public float Yaw { get; set; } = -90f;
         public float Pitch { get; set; } = 0f;
-        private float _aspectRatio = 1.0f;
-        public bool IsRightMouseDown { get; set; }
         public float AspectRatio { get; set; }
+        public float MovementSpeed { get; set; } = 0.1f;
+        public float MouseSensitivity { get; set; } = 0.1f;
+        public bool IsRightMouseDown { get; set; }
 
         public Camera(Vector3 position, float aspectRatio)
         {
@@ -50,61 +48,35 @@ namespace AsheronBuilder.Rendering
         {
             return Matrix4.CreatePerspectiveFieldOfView(
                 MathHelper.DegreesToRadians(45.0f),
-                _aspectRatio,
+                AspectRatio,
                 0.1f,
                 100.0f);
-        }
-        
-        public void SetAspectRatio(float aspectRatio)
-        {
-            _aspectRatio = aspectRatio;
         }
 
         public void HandleMouseInput(float deltaX, float deltaY)
         {
-            Yaw += deltaX * 0.1f;
-            Pitch -= deltaY * 0.1f;
+            Yaw += deltaX * MouseSensitivity;
+            Pitch -= deltaY * MouseSensitivity;
             Pitch = MathHelper.Clamp(Pitch, -89f, 89f);
             UpdateVectors();
         }
-        
-        public struct Ray
+
+        public void MoveForward(float distance)
         {
-            public Vector3 Origin;
-            public Vector3 Direction;
-
-            public Ray(Vector3 origin, Vector3 direction)
-            {
-                Origin = origin;
-                Direction = direction.Normalized();
-            }
-
-            public bool Intersects(Plane plane, out float distance)
-            {
-                float denom = Vector3.Dot(plane.Normal, Direction);
-                if (Math.Abs(denom) > float.Epsilon)
-                {
-                    Vector3 p0l0 = plane.Normal * plane.D - Origin;
-                    distance = Vector3.Dot(p0l0, plane.Normal) / denom;
-                    return distance >= 0;
-                }
-
-                distance = 0;
-                return false;
-            }
+            Position += Front * distance;
         }
-        
-        public struct Plane
+
+        public void MoveRight(float distance)
         {
-            public Vector3 Normal;
-            public float D;
-
-            public Plane(Vector3 normal, float d)
-            {
-                Normal = normal.Normalized();
-                D = d;
-            }
+            Position += Right * distance;
         }
+
+        public void MoveUp(float distance)
+        {
+            Position += Vector3.UnitY * distance;
+        }
+
+
 
         public Ray GetPickingRay(Vector2 mousePosition, float viewportWidth, float viewportHeight)
         {
